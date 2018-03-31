@@ -1,168 +1,143 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
+enum LEDType {
+    RGB,
+    RGBW
+};
+
 /*
- * Connection configuration
+ * Configuration
  */
 
-#define FIRMWARE_VERSION                        "1.0.0"
+#define DEBUG_LEVEL                             1
+
+#define VIBELIGHT_NODE_ID                       "vibelight_AAAABBBB"
+#define FIRMWARE_VERSION                        "5.0.0"
 
 #define WIFI_SSID                               ""
 #define WIFI_PASSWORD                           ""
 
-#define MQTT_CLIENTID                           "Vibelight Device XXXXXXXXXXXXXX"
+#define MQTT_CLIENTID                           VIBELIGHT_NODE_ID
 #define MQTT_SERVER                             ""
 #define MQTT_SERVER_TLS_FINGERPRINT             ""
 #define MQTT_PORT                               8883
-#define MQTT_USERNAME                           "device_XXXXXXXXXXXXXX"
+#define MQTT_USERNAME                           VIBELIGHT_NODE_ID
 #define MQTT_PASSWORD                           ""
 
-#define MQTT_CHANNEL_COLOR                      "/openhab/vibelight/XXXXXXXXXXXXXX/color/"
+#define MQTT_CHANNEL_STATE                      "/vibelight/api/5/id/AAAABBBB/state/"
+#define MQTT_CHANNEL_COMMAND                    "/vibelight/api/5/id/AAAABBBB/command/"
 
 // Try to connect N times and reset chip if limit is exceeded
 #define CONNECTION_RETRIES                      3
 
 // Uncomment if on the board is a onboard LED
-// #define PIN_STATUSLED                           LED_BUILTIN
+#define PIN_STATUSLED                           LED_BUILTIN
+
+#define LED_TYPE                                RGB
+
+/*
+ * Define some optional offsets for color channels in the range 0..255
+ * to trim some possible color inconsistency of the LED strip:
+ */
+#define LED_RED_OFFSET                          0
+#define LED_GREEN_OFFSET                        0
+#define LED_BLUE_OFFSET                         0
+#define LED_WHITE_OFFSET                        0
+
+#define CROSSFADE_ENABLED                       true
+#define CROSSFADE_DELAY_MICROSECONDS            1500
+#define CROSSFADE_STEPCOUNT                     256
 
 #define PIN_LED_RED                             14
 #define PIN_LED_GREEN                           13
 #define PIN_LED_BLUE                            12
 #define PIN_LED_WHITE                           11
 
-#define CROSSFADE_ENABLED                       true
-#define CROSSFADE_DELAY                         2
-#define CROSSFADE_STEPCOUNT                     255
-
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
 PubSubClient MQTTClient = PubSubClient(secureWifiClient);
+
+bool stateOnOff;
+bool transitionEffectEnabled;
+uint8_t brightness; 
+
+// These color values are the original state values:
+uint8_t originalRedValue = 0;
+uint8_t originalGreenValue = 0;
+uint8_t originalBlueValue = 0;
+uint8_t originalWhiteValue = 0;
+
+// These color values include color offset and brightness:
+uint8_t currentRedValue = 0;
+uint8_t currentGreenValue = 0; 
+uint8_t currentBlueValue = 0;
+uint8_t currentWhiteValue = 0;
+
+/*
+ * Setup
+ */
 
 void setup()
 {
     Serial.begin(115200);
     delay(250);
 
-    setupPins();
-    setupLEDStrip();
+    char buffer[64] = {0};
+    sprintf(buffer, "setup(): The node '%s' was powered up.", MQTT_CLIENTID);
+    Serial.println(buffer);
+
+    setupLEDs();
     setupWifi();
     setupMQTT();
 }
 
-void setupPins()
+void setupLEDs()
 {
+    Serial.println("setupLEDs(): Setup LEDs...");
+
     #ifdef PIN_STATUSLED
         pinMode(PIN_STATUSLED, OUTPUT);
     #endif
 
-    pinMode(PIN_LED_RED, OUTPUT);
-    pinMode(PIN_LED_GREEN, OUTPUT);   
-    pinMode(PIN_LED_BLUE, OUTPUT); 
-}
+    // Set initial values for LED
+    stateOnOff = true;
+    transitionEffectEnabled = true;
+    brightness = 255;
 
-void setupLEDStrip()
-{
-    Serial.println("Setup LED strip...");
-
-    uint32_t defaultColor = 0xFFFFFF;
-    showGivenColor(defaultColor);
-}
-
-void showGivenColor(const uint32_t color)
-{
-    if (CROSSFADE_ENABLED)
+    // For RGBW LED type show only the native white LEDs
+    if (LED_TYPE == RGBW)
     {
-        showGivenColorWithFadeEffect(color);
+        originalRedValue = 0;
+        originalGreenValue = 0;
+        originalBlueValue = 0;
+        originalWhiteValue = 255;
     }
     else
     {
-        showGivenColorImmediately(color);
-    }
-}
-
-void showGivenColorWithFadeEffect(const uint32_t color)
-{
-    // Split new color into its color parts
-    const int newRed = (color >> 16) & 0xFF;
-    const int newGreen = (color >> 8) & 0xFF;
-    const int newBlue = (color >> 0) & 0xFF;
-
-    // Calulate step count between old and new color value for each color part
-    const int stepCountRed = calculateStepsBetweenColorValues(oldRed, newRed);
-    const int stepCountGreen = calculateStepsBetweenColorValues(oldGreen, newGreen); 
-    const int stepCountBlue = calculateStepsBetweenColorValues(oldBlue, newBlue);
-
-    for (int i = 0; i <= CROSSFADE_STEPCOUNT; i++)
-    {
-        currentRed = calculateSteppedColorValue(stepCountRed, currentRed, i);
-        currentGreen = calculateSteppedColorValue(stepCountGreen, currentGreen, i);
-        currentBlue = calculateSteppedColorValue(stepCountBlue, currentBlue, i);
-
-        const int currentColor = (currentRed << 16) | (currentGreen << 8) | (currentBlue << 0);
-        showGivenColorImmediately(currentColor);
-
-        delay(CROSSFADE_DELAY);
+        originalRedValue = 255;
+        originalGreenValue = 255;
+        originalBlueValue = 255;
+        originalWhiteValue = 0;
     }
 
-    oldRed = currentRed; 
-    oldGreen = currentGreen; 
-    oldBlue = currentBlue;
-}
+    #if DEBUG_LEVEL >= 2
+        Serial.print(F("setupLEDs(): originalRedValue = "));
+        Serial.print(originalRedValue);
+        Serial.print(F(", originalGreenValue = "));
+        Serial.print(originalGreenValue);
+        Serial.print(F(", originalBlueValue = "));
+        Serial.print(originalBlueValue);
+        Serial.print(F(", originalWhiteValue = "));
+        Serial.print(originalWhiteValue);
+        Serial.println();
+    #endif
 
-int calculateStepsBetweenColorValues(const int oldColorValue, const int newColorValue)
-{
-    int colorValueDifference = newColorValue - oldColorValue;
-
-    if (colorValueDifference)
-    {
-        colorValueDifference = CROSSFADE_STEPCOUNT / colorValueDifference;
-    }
-
-    return colorValueDifference;
-}
-
-int calculateSteppedColorValue(const int stepCount, const int currentColorValue, const int i) {
-
-    int steppedColorValue = currentColorValue;
-
-    if (stepCount && (i % stepCount) == 0)
-    {
-        if (stepCount > 0)
-        {              
-            steppedColorValue += 1;           
-        } 
-        else if (stepCount < 0)
-        {
-            steppedColorValue -= 1;
-        } 
-    }
-
-    steppedColorValue = constrain(steppedColorValue, 0, 255);
-    return steppedColorValue;
-}
-
-void showGivenColorImmediately(const uint32_t color)
-{
-    const int rawRed = (color >> 16) & 0xFF;
-    const int rawGreen = (color >> 8) & 0xFF;
-    const int rawBlue = (color >> 0) & 0xFF;
-
-    int mappedRed = map(rawRed, 0, 255, 0, 1024);
-    mappedRed = constrain(mappedRed, 0, 1024);
-
-    int mappedGreen = map(rawGreen, 0, 255, 0, 1024);
-    mappedGreen = constrain(mappedGreen, 0, 1024);
-
-    int mappedBlue = map(rawBlue, 0, 255, 0, 1024);
-    mappedBlue = constrain(mappedBlue, 0, 1024);
-
-    analogWrite(PIN_LED_RED, mappedRed);
-    analogWrite(PIN_LED_GREEN, mappedGreen);
-    analogWrite(PIN_LED_BLUE, mappedBlue);
+    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionEffectEnabled);
 }
 
 void setupWifi()
 {
-    Serial.printf("Connecting to to Wi-Fi access point '%s'...\n", WIFI_SSID);
+    Serial.printf("setupWifi(): Connecting to to Wi-Fi access point '%s'...\n", WIFI_SSID);
 
     // Do not store Wi-Fi config in SDK flash area
     WiFi.persistent(false);
@@ -183,7 +158,7 @@ void setupWifi()
 
     Serial.println();
 
-    Serial.print(F("Connected to Wi-Fi access point. Obtained IP address: "));
+    Serial.print(F("setupWifi(): Connected to Wi-Fi access point. Obtained IP address: "));
     Serial.println(WiFi.localIP());
 }
 
@@ -221,7 +196,7 @@ void MQTTRequestCallback(char* topic, byte* payload, unsigned int length)
 
         const char* payloadAsCharPointer = (char*) payload;
 
-        if (strcmp(topic, MQTT_CHANNEL_COLOR) == 0)
+        if (strcmp(topic, MQTT_CHANNEL_STATE) == 0)
         {
             const uint32_t desiredColor = getRGBColorFromPayload(payloadAsCharPointer, 0);
             Serial.printf("Set color: %06X\n", desiredColor);
@@ -231,44 +206,175 @@ void MQTTRequestCallback(char* topic, byte* payload, unsigned int length)
     }
 }
 
-uint32_t getRGBColorFromPayload(const char* payload, const uint8_t startPosition)
+void onLightChangedPacketReceived(asbPacket &canPacket)
 {
-    uint32_t color = 0x000000;
+    stateOnOff = canPacket.data[1];
+    brightness = constrainBetweenByte(canPacket.data[2]);
 
-    if (!payload)
+    const uint8_t redValue = constrainBetweenByte(canPacket.data[3]);
+    const uint8_t greenValue = constrainBetweenByte(canPacket.data[4]);
+    const uint8_t blueValue = constrainBetweenByte(canPacket.data[5]);
+    const uint8_t whiteValue = constrainBetweenByte(canPacket.data[6]);
+
+    transitionEffectEnabled = (canPacket.data[7] == 0x01);
+
+    #if DEBUG_LEVEL >= 1
+        Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
+        Serial.print(F("stateOnOff = "));
+        Serial.print(stateOnOff);
+        Serial.print(F(", brightness = "));
+        Serial.print(brightness);
+        Serial.print(F(", redValue = "));
+        Serial.print(redValue);
+        Serial.print(F(", greenValue = "));
+        Serial.print(greenValue);
+        Serial.print(F(", blueValue = "));
+        Serial.print(blueValue);
+        Serial.print(F(", whiteValue = "));
+        Serial.print(whiteValue);
+        Serial.print(F(", transitionEffectEnabled = "));
+        Serial.print(transitionEffectEnabled);
+        Serial.println();
+    #endif
+
+    originalRedValue = redValue;
+    originalGreenValue = greenValue;
+    originalBlueValue = blueValue;
+    originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
+
+    const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
+    const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
+    const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
+    const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
+
+    const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
+    const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
+    const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
+    const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
+
+    if (stateOnOff == true)
     {
-        Serial.println("Invalid argument (nullpointer) given!");
+        showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
     }
     else
     {
-        // Pre-initialized char array (length = 7) with terminating null character:
-        char rbgColorString[7] = { '0', '0', '0', '0', '0', '0', '\0' };
-        strncpy(rbgColorString, payload + startPosition, 6);
-
-        // Convert hexadecimal RGB color strings to decimal integer
-        const uint32_t convertedRGBColor = strtol(rbgColorString, NULL, 16);
-
-        // Verify that the given color values are in a valid range
-        if ( convertedRGBColor >= 0x000000 && convertedRGBColor <= 0xFFFFFF )
-        {
-            color = convertedRGBColor;
-        }
+        showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
     }
+}
 
-    return color;
+void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffectEnabled)
+{
+    #if DEBUG_LEVEL >= 2
+        Serial.print(F("showGivenColor(): redValue = "));
+        Serial.print(redValue);
+        Serial.print(F(", greenValue = "));
+        Serial.print(greenValue);
+        Serial.print(F(", blueValue = "));
+        Serial.print(blueValue);
+        Serial.print(F(", whiteValue = "));
+        Serial.print(whiteValue);
+        Serial.println();
+    #endif
+
+    if (CROSSFADE_ENABLED && transitionEffectEnabled)
+    {
+        showGivenColorWithTransition(redValue, greenValue, blueValue, whiteValue);
+    }
+    else
+    {
+        showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
+    }
+}
+
+void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+{
+    // Calculate step value to get from current shown color to new color
+    const float valueChangePerStepRed = calculateValueChangePerStep(currentRedValue, redValue);
+    const float valueChangePerStepGreen = calculateValueChangePerStep(currentGreenValue, greenValue);
+    const float valueChangePerStepBlue = calculateValueChangePerStep(currentBlueValue, blueValue);
+    const float valueChangePerStepWhite = calculateValueChangePerStep(currentWhiteValue, whiteValue);
+
+    #if DEBUG_LEVEL >= 2
+        Serial.print(F("showGivenColorWithTransition(): valueChangePerStepRed = "));
+        Serial.print(valueChangePerStepRed);
+        Serial.print(F(", valueChangePerStepGreen = "));
+        Serial.print(valueChangePerStepGreen);
+        Serial.print(F(", valueChangePerStepBlue = "));
+        Serial.print(valueChangePerStepBlue);
+        Serial.print(F(", valueChangePerStepWhite = "));
+        Serial.print(valueChangePerStepWhite);
+        Serial.println();
+    #endif
+
+    // Start temporary color variable with current color value
+    float tempRedValue = currentRedValue;
+    float tempGreenValue = currentGreenValue; 
+    float tempBlueValue = currentBlueValue;
+    float tempWhiteValue = currentWhiteValue;
+
+    // For N steps, add the step value to the temporary color variable to have new current color value 
+    for (int i = 0; i < CROSSFADE_STEPCOUNT; i++)
+    {
+        tempRedValue = tempRedValue + valueChangePerStepRed;
+        tempGreenValue = tempGreenValue + valueChangePerStepGreen;
+        tempBlueValue = tempBlueValue + valueChangePerStepBlue;
+        tempWhiteValue = tempWhiteValue + valueChangePerStepWhite;
+
+        showGivenColorImmediately(
+            round(tempRedValue),
+            round(tempGreenValue),
+            round(tempBlueValue),
+            round(tempWhiteValue)
+        );
+
+        delayMicroseconds(CROSSFADE_DELAY_MICROSECONDS);
+    }
+}
+
+void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+{
+    #if DEBUG_LEVEL >= 2
+        Serial.print(F("showGivenColorImmediately(): redValue = "));
+        Serial.print(redValue);
+        Serial.print(F(", greenValue = "));
+        Serial.print(greenValue);
+        Serial.print(F(", blueValue = "));
+        Serial.print(blueValue);
+        Serial.print(F(", whiteValue = "));
+        Serial.print(whiteValue);
+        Serial.println();
+    #endif
+
+    currentRedValue = redValue;
+    currentGreenValue = greenValue;
+    currentBlueValue = blueValue;
+    currentWhiteValue = whiteValue;
+
+    analogWrite(PIN_LED_RED, currentRedValue);
+    analogWrite(PIN_LED_GREEN, currentGreenValue);
+    analogWrite(PIN_LED_BLUE, currentBlueValue);
+    analogWrite(PIN_LED_WHITE, currentWhiteValue);
+}
+
+uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
+{
+    return constrain(valueToConstrain, 0, 255);
+}
+
+uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brigthnessValue)
+{
+    return map(colorValue, 0, 255, 0, brigthnessValue);
+}
+
+float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endValue)
+{
+    return ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
 }
 
 void loop()
 {
-    // High priority for MQTT packets if client is enabled
-    if (mqttClientEnabled == true)
-    {
-        connectMQTT();
-        MQTTClient.loop();
-    }
-
-    // Lower priority for web interface requests
-    webServer.handleClient();
+    connectMQTT();
+    MQTTClient.loop();
 }
 
 void connectMQTT()
@@ -282,7 +388,7 @@ void connectMQTT()
         uint8_t retries = CONNECTION_RETRIES;
     #endif
 
-    while ( MQTTClient.connected() == false )
+    while (MQTTClient.connected() == false)
     {
         Serial.print("Attempting MQTT connection... ");
 
@@ -291,7 +397,7 @@ void connectMQTT()
             Serial.println("Connected.");
 
             // (Re)subscribe on topics
-            MQTTClient.subscribe(MQTT_CHANNEL_COLOR);
+            MQTTClient.subscribe(MQTT_CHANNEL_STATE);
         }
         else
         {
