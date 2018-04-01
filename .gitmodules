@@ -2,3 +2,7 @@
 	path = src/Firmware/libraries/PubSubClient
 	url = https://github.com/bastianraschke/pubsubclient.git
 	branch = master
+[submodule "src/Firmware/libraries/ArduinoJson"]
+	path = src/Firmware/libraries/ArduinoJson
+	url = https://github.com/bastianraschke/ArduinoJson.git
+	branch = master
