@@ -2,15 +2,14 @@
 
 Example configuration:
 
-    light:
-
-      - platform: mqtt_json
-        name: "My RGBW light"
-        state_topic: "/vibelight/api/5/id/AAAABBBB/state/"
-        command_topic: "/vibelight/api/5/id/AAAABBBB/command/"
-        brightness: true
-        rgb: true
-        white_value: true
-        effect: false
-        optimistic: false
-        qos: 0
+  light:
+    - platform: mqtt_json
+      name: "My RGBW light"
+      state_topic: "/vibelight/api/5/id/AAAABBBB/state/"
+      command_topic: "/vibelight/api/5/id/AAAABBBB/command/"
+      brightness: true
+      rgb: true
+      white_value: true
+      effect: false
+      optimistic: false
+      qos: 0

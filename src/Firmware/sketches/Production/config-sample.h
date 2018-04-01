@@ -9,6 +9,8 @@ enum LEDType {
 
 #define DEBUG_LEVEL                             1
 
+// Generate a random id with:
+// $ echo -n "vibelight_"; head /dev/urandom | tr -dc A-Z0-9 | head -c 8; echo ""
 #define VIBELIGHT_NODE_ID                       "vibelight_AAAABBBB"
 
 #define WIFI_SSID                               ""
