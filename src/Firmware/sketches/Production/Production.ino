@@ -1,58 +1,10 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
-enum LEDType {
-    RGB,
-    RGBW
-};
+#include "config.h"
 
-/*
- * Configuration
- */
-
-#define DEBUG_LEVEL                             1
-
-#define VIBELIGHT_NODE_ID                       "vibelight_AAAABBBB"
 #define FIRMWARE_VERSION                        "5.0.0"
-
-#define WIFI_SSID                               ""
-#define WIFI_PASSWORD                           ""
-
-#define MQTT_CLIENTID                           VIBELIGHT_NODE_ID
-#define MQTT_SERVER                             ""
-#define MQTT_SERVER_TLS_FINGERPRINT             ""
-#define MQTT_PORT                               8883
-#define MQTT_USERNAME                           VIBELIGHT_NODE_ID
-#define MQTT_PASSWORD                           ""
-
-#define MQTT_CHANNEL_STATE                      "/vibelight/api/5/id/AAAABBBB/state/"
-#define MQTT_CHANNEL_COMMAND                    "/vibelight/api/5/id/AAAABBBB/command/"
-
-// Try to connect N times and reset chip if limit is exceeded
-#define CONNECTION_RETRIES                      3
-
-// Uncomment if on the board is a onboard LED
-#define PIN_STATUSLED                           LED_BUILTIN
-
-#define LED_TYPE                                RGB
-
-/*
- * Define some optional offsets for color channels in the range 0..255
- * to trim some possible color inconsistency of the LED strip:
- */
-#define LED_RED_OFFSET                          0
-#define LED_GREEN_OFFSET                        0
-#define LED_BLUE_OFFSET                         0
-#define LED_WHITE_OFFSET                        0
-
-#define CROSSFADE_ENABLED                       true
-#define CROSSFADE_DELAY_MICROSECONDS            1500
-#define CROSSFADE_STEPCOUNT                     256
-
-#define PIN_LED_RED                             14
-#define PIN_LED_GREEN                           13
-#define PIN_LED_BLUE                            12
-#define PIN_LED_WHITE                           11
 
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
 PubSubClient MQTTClient = PubSubClient(secureWifiClient);
@@ -181,86 +133,101 @@ void blinkStatusLED(const int times)
 void setupMQTT()
 {
     MQTTClient.setServer(MQTT_SERVER, MQTT_PORT);
-    MQTTClient.setCallback(MQTTRequestCallback);
+    MQTTClient.setCallback(onMessageReceivedCallback);
 }
 
-void MQTTRequestCallback(char* topic, byte* payload, unsigned int length)
+void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 {
     if (!topic || !payload)
     {
-        Serial.println("Invalid argument (nullpointer) given!");
+        Serial.println("onMessageReceivedCallback(): Invalid argument (nullpointer) given!");
     }
     else
     {
-        Serial.printf("Message arrived on channel: %s\n", topic);
+        Serial.printf("onMessageReceivedCallback(): Message arrived on channel: %s\n", topic);
 
-        const char* payloadAsCharPointer = (char*) payload;
+        char message[length + 1];
 
-        if (strcmp(topic, MQTT_CHANNEL_STATE) == 0)
+        for (int i = 0; i < length; i++)
         {
-            const uint32_t desiredColor = getRGBColorFromPayload(payloadAsCharPointer, 0);
-            Serial.printf("Set color: %06X\n", desiredColor);
-
-            showGivenColor(desiredColor);
+            message[i] = (char)payload[i];
         }
+
+        message[length] = '\0';
+
+        Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s':\n%s\n", topic, message);
     }
 }
 
-void onLightChangedPacketReceived(asbPacket &canPacket)
-{
-    stateOnOff = canPacket.data[1];
-    brightness = constrainBetweenByte(canPacket.data[2]);
+/*
+Example payload (RGBW):
 
-    const uint8_t redValue = constrainBetweenByte(canPacket.data[3]);
-    const uint8_t greenValue = constrainBetweenByte(canPacket.data[4]);
-    const uint8_t blueValue = constrainBetweenByte(canPacket.data[5]);
-    const uint8_t whiteValue = constrainBetweenByte(canPacket.data[6]);
-
-    transitionEffectEnabled = (canPacket.data[7] == 0x01);
-
-    #if DEBUG_LEVEL >= 1
-        Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
-        Serial.print(F("stateOnOff = "));
-        Serial.print(stateOnOff);
-        Serial.print(F(", brightness = "));
-        Serial.print(brightness);
-        Serial.print(F(", redValue = "));
-        Serial.print(redValue);
-        Serial.print(F(", greenValue = "));
-        Serial.print(greenValue);
-        Serial.print(F(", blueValue = "));
-        Serial.print(blueValue);
-        Serial.print(F(", whiteValue = "));
-        Serial.print(whiteValue);
-        Serial.print(F(", transitionEffectEnabled = "));
-        Serial.print(transitionEffectEnabled);
-        Serial.println();
-    #endif
-
-    originalRedValue = redValue;
-    originalGreenValue = greenValue;
-    originalBlueValue = blueValue;
-    originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
-
-    const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
-    const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
-    const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
-    const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
-
-    const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
-    const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
-    const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
-    const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
-
-    if (stateOnOff == true)
     {
-        showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
+      "brightness": 120,
+      "color": {
+        "r": 255,
+        "g": 100,
+        "b": 100
+      },
+      "white_value": 255,
+      "state": "ON"
     }
-    else
-    {
-        showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
-    }
-}
+*/
+// void onLightChangedPacketReceived(asbPacket &canPacket)
+// {
+//     stateOnOff = canPacket.data[1];
+//     brightness = constrainBetweenByte(canPacket.data[2]);
+
+//     const uint8_t redValue = constrainBetweenByte(canPacket.data[3]);
+//     const uint8_t greenValue = constrainBetweenByte(canPacket.data[4]);
+//     const uint8_t blueValue = constrainBetweenByte(canPacket.data[5]);
+//     const uint8_t whiteValue = constrainBetweenByte(canPacket.data[6]);
+
+//     transitionEffectEnabled = (canPacket.data[7] == 0x01);
+
+//     #if DEBUG_LEVEL >= 1
+//         Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
+//         Serial.print(F("stateOnOff = "));
+//         Serial.print(stateOnOff);
+//         Serial.print(F(", brightness = "));
+//         Serial.print(brightness);
+//         Serial.print(F(", redValue = "));
+//         Serial.print(redValue);
+//         Serial.print(F(", greenValue = "));
+//         Serial.print(greenValue);
+//         Serial.print(F(", blueValue = "));
+//         Serial.print(blueValue);
+//         Serial.print(F(", whiteValue = "));
+//         Serial.print(whiteValue);
+//         Serial.print(F(", transitionEffectEnabled = "));
+//         Serial.print(transitionEffectEnabled);
+//         Serial.println();
+//     #endif
+
+//     originalRedValue = redValue;
+//     originalGreenValue = greenValue;
+//     originalBlueValue = blueValue;
+//     originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
+
+//     const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
+//     const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
+//     const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
+//     const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
+
+//     const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
+//     const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
+//     const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
+//     const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
+
+//     if (stateOnOff == true)
+//     {
+//         showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
+//     }
+//     else
+//     {
+//         showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
+//     }
+// }
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffectEnabled)
 {
@@ -397,7 +364,7 @@ void connectMQTT()
             Serial.println("connectMQTT(): Connected.");
 
             // (Re)subscribe on topics
-            MQTTClient.subscribe(MQTT_CHANNEL_STATE);
+            MQTTClient.subscribe(MQTT_CHANNEL_COMMAND);
         }
         else
         {
