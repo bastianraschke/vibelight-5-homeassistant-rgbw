@@ -18,16 +18,16 @@ enum LEDType {
 
 #define MQTT_CLIENTID                           VIBELIGHT_NODE_ID
 #define MQTT_SERVER                             ""
-#define MQTT_SERVER_TLS_FINGERPRINT             ""
+
+// Use the SHA1 fingerprint of the server certificate (NOT the CA certificate) in the following format:
+#define MQTT_SERVER_TLS_FINGERPRINT             "XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX"
+
 #define MQTT_PORT                               8883
 #define MQTT_USERNAME                           VIBELIGHT_NODE_ID
 #define MQTT_PASSWORD                           ""
 
 #define MQTT_CHANNEL_STATE                      "/vibelight/api/5/id/AAAABBBB/state/"
 #define MQTT_CHANNEL_COMMAND                    "/vibelight/api/5/id/AAAABBBB/command/"
-
-// Try to connect N times and reset chip if limit is exceeded
-#define CONNECTION_RETRIES                      3
 
 // Uncomment if on the board is a onboard LED
 #define PIN_STATUSLED                           LED_BUILTIN
