@@ -390,23 +390,23 @@ void connectMQTT()
 
     while (MQTTClient.connected() == false)
     {
-        Serial.print("Attempting MQTT connection... ");
+        Serial.println("connectMQTT(): Attempting MQTT connection... ");
 
         if (MQTTClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_SERVER_TLS_FINGERPRINT) == true)
         {
-            Serial.println("Connected.");
+            Serial.println("connectMQTT(): Connected.");
 
             // (Re)subscribe on topics
             MQTTClient.subscribe(MQTT_CHANNEL_STATE);
         }
         else
         {
-            Serial.printf("Connection failed! Error code: %i\n", MQTTClient.state());
+            Serial.printf("connectMQTT(): Connection failed! Error code: %i\n", MQTTClient.state());
 
             // Blink 3 times for indication of failed MQTT connection
             blinkStatusLED(3);
 
-            Serial.println("Try again in 1 second...");
+            Serial.println("connectMQTT(): Try again in 1 second...");
             delay(1000);
 
             #ifdef CONNECTION_RETRIES
@@ -414,7 +414,7 @@ void connectMQTT()
 
                 if (retries == 0)
                 {
-                    Serial.println("Connection failed too often.");
+                    Serial.println("connectMQTT(): Connection failed too often.");
 
                     // Exit loop
                     break;
