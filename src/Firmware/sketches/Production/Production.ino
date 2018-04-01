@@ -36,6 +36,7 @@ void setup()
 
     char buffer[64] = {0};
     sprintf(buffer, "setup(): The node '%s' was powered up.", MQTT_CLIENTID);
+    Serial.println();
     Serial.println(buffer);
 
     setupLEDs();
@@ -105,10 +106,8 @@ void setupWifi()
         blinkStatusLED(2);
 
         delay(500);
-        Serial.print(F("."));
+        Serial.println(F("setupWifi(): Connecting..."));
     }
-
-    Serial.println();
 
     Serial.print(F("setupWifi(): Connected to Wi-Fi access point. Obtained IP address: "));
     Serial.println(WiFi.localIP());
@@ -156,6 +155,11 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
         message[length] = '\0';
 
         Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s':\n%s\n", topic, message);
+
+        // TODO: Handle message
+
+
+
     }
 }
 
@@ -346,22 +350,13 @@ void loop()
 
 void connectMQTT()
 {
-    if (MQTTClient.connected() == true)
-    {
-        return ;
-    }
-
-    #ifdef CONNECTION_RETRIES
-        uint8_t retries = CONNECTION_RETRIES;
-    #endif
-
     while (MQTTClient.connected() == false)
     {
-        Serial.println("connectMQTT(): Attempting MQTT connection... ");
+        Serial.println("connectMQTT(): Connecting...");
 
         if (MQTTClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_SERVER_TLS_FINGERPRINT) == true)
         {
-            Serial.println("connectMQTT(): Connected.");
+            Serial.println("connectMQTT(): Connected to MQTT broker.");
 
             // (Re)subscribe on topics
             MQTTClient.subscribe(MQTT_CHANNEL_COMMAND);
@@ -375,18 +370,6 @@ void connectMQTT()
 
             Serial.println("connectMQTT(): Try again in 1 second...");
             delay(1000);
-
-            #ifdef CONNECTION_RETRIES
-                retries--;
-
-                if (retries == 0)
-                {
-                    Serial.println("connectMQTT(): Connection failed too often.");
-
-                    // Exit loop
-                    break;
-                }
-            #endif
         }
     }
 }
