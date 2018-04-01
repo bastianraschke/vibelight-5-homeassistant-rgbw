@@ -12,7 +12,7 @@ const int BUFFER_SIZE = JSON_OBJECT_SIZE(20);
 
 bool stateOnOff;
 bool transitionEffectEnabled;
-uint8_t brightness; 
+uint8_t brightness;
 
 // These color values are the original state values:
 uint8_t originalRedValue = 0;
@@ -22,7 +22,7 @@ uint8_t originalWhiteValue = 0;
 
 // These color values include color offset and brightness:
 uint8_t currentRedValue = 0;
-uint8_t currentGreenValue = 0; 
+uint8_t currentGreenValue = 0;
 uint8_t currentBlueValue = 0;
 uint8_t currentWhiteValue = 0;
 
@@ -144,28 +144,32 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
     }
     else
     {
-        Serial.printf("onMessageReceivedCallback(): Message arrived on channel: %s\n", topic);
-
-        char message[length + 1];
+        char payloadMessage[length + 1];
 
         for (int i = 0; i < length; i++)
         {
-            message[i] = (char)payload[i];
+            payloadMessage[i] = (char) payload[i];
         }
 
-        message[length] = '\0';
+        payloadMessage[length] = '\0';
 
-        Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s':\n%s\n", topic, message);
+        Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s':\n%s\n", topic, payloadMessage);
 
-        // TODO: Handle message
-        // onLightChangedPacketReceived();
-
-        publishState();
+        if (updateValuesAccordingJsonMessage(payloadMessage))
+        {
+            publishState();
+            blinkStatusLED(1);
+        }
+        else
+        {
+            Serial.println("onMessageReceivedCallback(): The payload could not be parsed as JSON!");
+            blinkStatusLED(2);
+        }
     }
 }
 
 /*
-Example payload (RGBW):
+    Example payload (RGBW):
 
     {
       "brightness": 120,
@@ -175,64 +179,114 @@ Example payload (RGBW):
         "b": 100
       },
       "white_value": 255,
+      "transition": 5,
       "state": "ON"
     }
 */
-// void onLightChangedPacketReceived(asbPacket &canPacket)
-// {
-//     stateOnOff = canPacket.data[1];
-//     brightness = constrainBetweenByte(canPacket.data[2]);
+bool updateValuesAccordingJsonMessage(char* jsonPayload)
+{
+    bool wasSuccessfulParsed = true;
 
-//     const uint8_t redValue = constrainBetweenByte(canPacket.data[3]);
-//     const uint8_t greenValue = constrainBetweenByte(canPacket.data[4]);
-//     const uint8_t blueValue = constrainBetweenByte(canPacket.data[5]);
-//     const uint8_t whiteValue = constrainBetweenByte(canPacket.data[6]);
+    StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
+    JsonObject& root = jsonBuffer.parseObject(jsonPayload);
 
-//     transitionEffectEnabled = (canPacket.data[7] == 0x01);
+    if (!root.success())
+    {
+        wasSuccessfulParsed = false;
+    }
+    else
+    {
+        if (root.containsKey("state"))
+        {
+            if (strcmp(root["state"], "ON") == 0)
+            {
+                stateOnOff = true;
+            }
+            else if (strcmp(root["state"], "OFF") == 0)
+            {
+                stateOnOff = false;
+            }
+        }
 
-//     #if DEBUG_LEVEL >= 1
-//         Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
-//         Serial.print(F("stateOnOff = "));
-//         Serial.print(stateOnOff);
-//         Serial.print(F(", brightness = "));
-//         Serial.print(brightness);
-//         Serial.print(F(", redValue = "));
-//         Serial.print(redValue);
-//         Serial.print(F(", greenValue = "));
-//         Serial.print(greenValue);
-//         Serial.print(F(", blueValue = "));
-//         Serial.print(blueValue);
-//         Serial.print(F(", whiteValue = "));
-//         Serial.print(whiteValue);
-//         Serial.print(F(", transitionEffectEnabled = "));
-//         Serial.print(transitionEffectEnabled);
-//         Serial.println();
-//     #endif
+        uint8_t redValue;
+        uint8_t greenValue;
+        uint8_t blueValue;
+        uint8_t whiteValue;
 
-//     originalRedValue = redValue;
-//     originalGreenValue = greenValue;
-//     originalBlueValue = blueValue;
-//     originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
+        if (root.containsKey("color"))
+        {
+            redValue = constrainBetweenByte(root["color"]["r"]);
+            greenValue = constrainBetweenByte(root["color"]["g"]);
+            blueValue = constrainBetweenByte(root["color"]["b"]);
+        }
 
-//     const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
-//     const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
-//     const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
-//     const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
+        if (LED_TYPE == RGBW && root.containsKey("white_value"))
+        {
+            whiteValue = constrainBetweenByte(root["white_value"]);
+        }
 
-//     const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
-//     const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
-//     const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
-//     const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
+        if (root.containsKey("brightness"))
+        {
+            brightness = constrainBetweenByte(root["brightness"]);
+        }
 
-//     if (stateOnOff == true)
-//     {
-//         showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
-//     }
-//     else
-//     {
-//         showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
-//     }
-// }
+        // TODO: Get from payload
+        transitionEffectEnabled = true;
+
+
+    // if (root.containsKey("transition")) {
+    //   transitionTime = root["transition"];
+    // }
+    // else {
+    //   transitionTime = 0;
+    // }
+
+        #if DEBUG_LEVEL >= 1
+            Serial.print(F("updateValuesAccordingJsonMessage(): The light was changed to: "));
+            Serial.print(F("stateOnOff = "));
+            Serial.print(stateOnOff);
+            Serial.print(F(", brightness = "));
+            Serial.print(brightness);
+            Serial.print(F(", redValue = "));
+            Serial.print(redValue);
+            Serial.print(F(", greenValue = "));
+            Serial.print(greenValue);
+            Serial.print(F(", blueValue = "));
+            Serial.print(blueValue);
+            Serial.print(F(", whiteValue = "));
+            Serial.print(whiteValue);
+            Serial.print(F(", transitionEffectEnabled = "));
+            Serial.print(transitionEffectEnabled);
+            Serial.println();
+        #endif
+
+        originalRedValue = redValue;
+        originalGreenValue = greenValue;
+        originalBlueValue = blueValue;
+        originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
+
+        const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
+        const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
+        const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
+        const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
+
+        const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
+        const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
+        const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
+        const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
+
+        if (stateOnOff == true)
+        {
+            showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
+        }
+        else
+        {
+            showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
+        }
+    }
+
+    return wasSuccessfulParsed;
+}
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffectEnabled)
 {
@@ -280,7 +334,7 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
 
     // Start temporary color variable with current color value
     float tempRedValue = currentRedValue;
-    float tempGreenValue = currentGreenValue; 
+    float tempGreenValue = currentGreenValue;
     float tempBlueValue = currentBlueValue;
     float tempWhiteValue = currentWhiteValue;
 
@@ -299,6 +353,7 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
             round(tempWhiteValue)
         );
 
+        // TODO: Do not delay to keep connection alive
         delayMicroseconds(CROSSFADE_DELAY_MICROSECONDS);
     }
 }
