@@ -7,7 +7,8 @@
 #define FIRMWARE_VERSION                        "5.0.0"
 
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
-PubSubClient MQTTClient = PubSubClient(secureWifiClient);
+PubSubClient mqttClient = PubSubClient(secureWifiClient);
+const int BUFFER_SIZE = JSON_OBJECT_SIZE(20);
 
 bool stateOnOff;
 bool transitionEffectEnabled;
@@ -131,8 +132,8 @@ void blinkStatusLED(const int times)
 
 void setupMQTT()
 {
-    MQTTClient.setServer(MQTT_SERVER, MQTT_PORT);
-    MQTTClient.setCallback(onMessageReceivedCallback);
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.setCallback(onMessageReceivedCallback);
 }
 
 void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
@@ -157,9 +158,9 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
         Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s':\n%s\n", topic, message);
 
         // TODO: Handle message
+        // onLightChangedPacketReceived();
 
-
-
+        publishState();
     }
 }
 
@@ -342,28 +343,56 @@ float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endVal
     return ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
 }
 
+void publishState()
+{
+    StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
+    JsonObject& root = jsonBuffer.createObject();
+
+    root["state"] = (stateOnOff == true) ? "ON" : "OFF";
+
+    JsonObject& color = root.createNestedObject("color");
+    color["r"] = originalRedValue;
+    color["g"] = originalGreenValue;
+    color["b"] = originalWhiteValue;
+
+    if (LED_TYPE == RGBW)
+    {
+        root["white_value"] = originalWhiteValue;
+    }
+
+    root["brightness"] = brightness;
+
+    char buffer[root.measureLength() + 1];
+    root.printTo(buffer, sizeof(buffer));
+
+    mqttClient.publish(MQTT_CHANNEL_STATE, buffer, true);
+}
+
 void loop()
 {
     connectMQTT();
-    MQTTClient.loop();
+    mqttClient.loop();
 }
 
 void connectMQTT()
 {
-    while (MQTTClient.connected() == false)
+    while (mqttClient.connected() == false)
     {
         Serial.println("connectMQTT(): Connecting...");
 
-        if (MQTTClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_SERVER_TLS_FINGERPRINT) == true)
+        if (mqttClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_SERVER_TLS_FINGERPRINT) == true)
         {
             Serial.println("connectMQTT(): Connected to MQTT broker.");
 
             // (Re)subscribe on topics
-            MQTTClient.subscribe(MQTT_CHANNEL_COMMAND);
+            mqttClient.subscribe(MQTT_CHANNEL_COMMAND);
+
+            // Initially publish current state
+            publishState();
         }
         else
         {
-            Serial.printf("connectMQTT(): Connection failed! Error code: %i\n", MQTTClient.state());
+            Serial.printf("connectMQTT(): Connection failed! Error code: %i\n", mqttClient.state());
 
             // Blink 3 times for indication of failed MQTT connection
             blinkStatusLED(3);
