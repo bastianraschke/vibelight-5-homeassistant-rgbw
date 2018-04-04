@@ -48,6 +48,4 @@ enum LEDType {
 #define PIN_LED_BLUE                            12
 #define PIN_LED_WHITE                           11
 
-#define CROSSFADE_ENABLED                       true
 #define CROSSFADE_DELAY_MICROSECONDS            1500
-#define CROSSFADE_STEPCOUNT                     256

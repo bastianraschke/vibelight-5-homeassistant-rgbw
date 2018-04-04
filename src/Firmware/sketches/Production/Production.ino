@@ -21,10 +21,20 @@ uint8_t originalBlueValue = 0;
 uint8_t originalWhiteValue = 0;
 
 // These color values include color offset and brightness:
-uint8_t currentRedValue = 0;
-uint8_t currentGreenValue = 0;
-uint8_t currentBlueValue = 0;
-uint8_t currentWhiteValue = 0;
+float currentRedValue = 0;
+float currentGreenValue = 0;
+float currentBlueValue = 0;
+float currentWhiteValue = 0;
+
+unsigned long lastTransitionAnimationUpdate = 0;
+
+const uint8_t crossfadeSteps = 255;
+uint8_t remainingCrossfadeSteps = 0;
+
+float valueChangePerCrossfadeStepRed = 0.0f;
+float valueChangePerCrossfadeStepGreen = 0.0f;
+float valueChangePerCrossfadeStepBlue = 0.0f;
+float valueChangePerCrossfadeStepWhite = 0.0f;
 
 /*
  * Setup
@@ -153,17 +163,15 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 
         payloadMessage[length] = '\0';
 
-        Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s':\n%s\n", topic, payloadMessage);
+        Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s': %s\n", topic, payloadMessage);
 
         if (updateValuesAccordingJsonMessage(payloadMessage))
         {
             publishState();
-            blinkStatusLED(1);
         }
         else
         {
             Serial.println("onMessageReceivedCallback(): The payload could not be parsed as JSON!");
-            blinkStatusLED(2);
         }
     }
 }
@@ -208,21 +216,21 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
             }
         }
 
-        uint8_t redValue;
-        uint8_t greenValue;
-        uint8_t blueValue;
-        uint8_t whiteValue;
+        uint8_t newRedValue;
+        uint8_t newGreenValue;
+        uint8_t newBlueValue;
+        uint8_t newWhiteValue;
 
         if (root.containsKey("color"))
         {
-            redValue = constrainBetweenByte(root["color"]["r"]);
-            greenValue = constrainBetweenByte(root["color"]["g"]);
-            blueValue = constrainBetweenByte(root["color"]["b"]);
+            newRedValue = constrainBetweenByte(root["color"]["r"]);
+            newGreenValue = constrainBetweenByte(root["color"]["g"]);
+            newBlueValue = constrainBetweenByte(root["color"]["b"]);
         }
 
         if (LED_TYPE == RGBW && root.containsKey("white_value"))
         {
-            whiteValue = constrainBetweenByte(root["white_value"]);
+            newWhiteValue = constrainBetweenByte(root["white_value"]);
         }
 
         if (root.containsKey("brightness"))
@@ -246,37 +254,37 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
             Serial.print(stateOnOff);
             Serial.print(F(", brightness = "));
             Serial.print(brightness);
-            Serial.print(F(", redValue = "));
-            Serial.print(redValue);
-            Serial.print(F(", greenValue = "));
-            Serial.print(greenValue);
-            Serial.print(F(", blueValue = "));
-            Serial.print(blueValue);
-            Serial.print(F(", whiteValue = "));
-            Serial.print(whiteValue);
+            Serial.print(F(", newRedValue = "));
+            Serial.print(newRedValue);
+            Serial.print(F(", newGreenValue = "));
+            Serial.print(newGreenValue);
+            Serial.print(F(", newBlueValue = "));
+            Serial.print(newBlueValue);
+            Serial.print(F(", newWhiteValue = "));
+            Serial.print(newWhiteValue);
             Serial.print(F(", transitionEffectEnabled = "));
             Serial.print(transitionEffectEnabled);
             Serial.println();
         #endif
 
-        originalRedValue = redValue;
-        originalGreenValue = greenValue;
-        originalBlueValue = blueValue;
-        originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
+        originalRedValue = newRedValue;
+        originalGreenValue = newGreenValue;
+        originalBlueValue = newBlueValue;
+        originalWhiteValue = (LED_TYPE == RGBW) ? newWhiteValue : 0;
 
-        const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
-        const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
-        const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
-        const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
+        const uint8_t newRedValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
+        const uint8_t newGreenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
+        const uint8_t newBlueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
+        const uint8_t newWhiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
 
-        const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
-        const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
-        const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
-        const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
+        const uint8_t newRedValueWithBrightness = mapColorValueWithBrightness(newRedValueWithOffset, brightness);
+        const uint8_t newGreenValueWithBrightness = mapColorValueWithBrightness(newGreenValueWithOffset, brightness);
+        const uint8_t newBlueValueWithBrightness = mapColorValueWithBrightness(newBlueValueWithOffset, brightness);
+        const uint8_t newWhiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(newWhiteValueWithOffset, brightness) : 0;
 
         if (stateOnOff == true)
         {
-            showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
+            showGivenColor(newRedValueWithBrightness, newGreenValueWithBrightness, newBlueValueWithBrightness, newWhiteValueWithBrightness, transitionEffectEnabled);
         }
         else
         {
@@ -287,99 +295,87 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
     return wasSuccessfulParsed;
 }
 
-void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffectEnabled)
+void showGivenColor(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue, const bool transitionEffectEnabled)
 {
     #if DEBUG_LEVEL >= 2
-        Serial.print(F("showGivenColor(): redValue = "));
-        Serial.print(redValue);
-        Serial.print(F(", greenValue = "));
-        Serial.print(greenValue);
-        Serial.print(F(", blueValue = "));
-        Serial.print(blueValue);
-        Serial.print(F(", whiteValue = "));
-        Serial.print(whiteValue);
+        Serial.print(F("showGivenColor(): newRedValue = "));
+        Serial.print(newRedValue);
+        Serial.print(F(", newGreenValue = "));
+        Serial.print(newGreenValue);
+        Serial.print(F(", newBlueValue = "));
+        Serial.print(newBlueValue);
+        Serial.print(F(", newWhiteValue = "));
+        Serial.print(newWhiteValue);
         Serial.println();
     #endif
 
-    if (CROSSFADE_ENABLED && transitionEffectEnabled)
+    if (transitionEffectEnabled)
     {
-        showGivenColorWithTransition(redValue, greenValue, blueValue, whiteValue);
+        startTransitionAnimation(newRedValue, newGreenValue, newBlueValue, newWhiteValue);
     }
     else
     {
-        showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
+        cancelRunningTransitionAnimation();
+        showGivenColorImmediately(newRedValue, newGreenValue, newBlueValue, newWhiteValue);
     }
 }
 
-void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+void startTransitionAnimation(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue)
 {
     // Calculate step value to get from current shown color to new color
-    const float valueChangePerStepRed = calculateValueChangePerStep(currentRedValue, redValue);
-    const float valueChangePerStepGreen = calculateValueChangePerStep(currentGreenValue, greenValue);
-    const float valueChangePerStepBlue = calculateValueChangePerStep(currentBlueValue, blueValue);
-    const float valueChangePerStepWhite = calculateValueChangePerStep(currentWhiteValue, whiteValue);
+    valueChangePerCrossfadeStepRed = calculateValueChangePerStep(currentRedValue, newRedValue);
+    valueChangePerCrossfadeStepGreen = calculateValueChangePerStep(currentGreenValue, newGreenValue);
+    valueChangePerCrossfadeStepBlue = calculateValueChangePerStep(currentBlueValue, newBlueValue);
+    valueChangePerCrossfadeStepWhite = calculateValueChangePerStep(currentWhiteValue, newWhiteValue);
+
+    remainingCrossfadeSteps = crossfadeSteps;
 
     #if DEBUG_LEVEL >= 2
-        Serial.print(F("showGivenColorWithTransition(): valueChangePerStepRed = "));
-        Serial.print(valueChangePerStepRed);
-        Serial.print(F(", valueChangePerStepGreen = "));
-        Serial.print(valueChangePerStepGreen);
-        Serial.print(F(", valueChangePerStepBlue = "));
-        Serial.print(valueChangePerStepBlue);
-        Serial.print(F(", valueChangePerStepWhite = "));
-        Serial.print(valueChangePerStepWhite);
+        Serial.print(F("startTransitionAnimation(): valueChangePerCrossfadeStepRed = "));
+        Serial.print(valueChangePerCrossfadeStepRed);
+        Serial.print(F(", valueChangePerCrossfadeStepGreen = "));
+        Serial.print(valueChangePerCrossfadeStepGreen);
+        Serial.print(F(", valueChangePerCrossfadeStepBlue = "));
+        Serial.print(valueChangePerCrossfadeStepBlue);
+        Serial.print(F(", valueChangePerCrossfadeStepWhite = "));
+        Serial.print(valueChangePerCrossfadeStepWhite);
         Serial.println();
     #endif
-
-    // Start temporary color variable with current color value
-    float tempRedValue = currentRedValue;
-    float tempGreenValue = currentGreenValue;
-    float tempBlueValue = currentBlueValue;
-    float tempWhiteValue = currentWhiteValue;
-
-    // For N steps, add the step value to the temporary color variable to have new current color value 
-    for (int i = 0; i < CROSSFADE_STEPCOUNT; i++)
-    {
-        tempRedValue = tempRedValue + valueChangePerStepRed;
-        tempGreenValue = tempGreenValue + valueChangePerStepGreen;
-        tempBlueValue = tempBlueValue + valueChangePerStepBlue;
-        tempWhiteValue = tempWhiteValue + valueChangePerStepWhite;
-
-        showGivenColorImmediately(
-            round(tempRedValue),
-            round(tempGreenValue),
-            round(tempBlueValue),
-            round(tempWhiteValue)
-        );
-
-        // TODO: Do not delay to keep connection alive
-        delayMicroseconds(CROSSFADE_DELAY_MICROSECONDS);
-    }
 }
 
-void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+void cancelRunningTransitionAnimation()
+{
+    valueChangePerCrossfadeStepRed = 0.0f;
+    valueChangePerCrossfadeStepGreen = 0.0f;
+    valueChangePerCrossfadeStepBlue = 0.0f;
+    valueChangePerCrossfadeStepWhite = 0.0f;
+
+    remainingCrossfadeSteps = 0;
+}
+
+void showGivenColorImmediately(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue)
 {
     #if DEBUG_LEVEL >= 2
-        Serial.print(F("showGivenColorImmediately(): redValue = "));
-        Serial.print(redValue);
-        Serial.print(F(", greenValue = "));
-        Serial.print(greenValue);
-        Serial.print(F(", blueValue = "));
-        Serial.print(blueValue);
-        Serial.print(F(", whiteValue = "));
-        Serial.print(whiteValue);
+        Serial.print(F("showGivenColorImmediately(): newRedValue = "));
+        Serial.print(newRedValue);
+        Serial.print(F(", newGreenValue = "));
+        Serial.print(newGreenValue);
+        Serial.print(F(", newBlueValue = "));
+        Serial.print(newBlueValue);
+        Serial.print(F(", newWhiteValue = "));
+        Serial.print(newWhiteValue);
         Serial.println();
     #endif
 
-    currentRedValue = redValue;
-    currentGreenValue = greenValue;
-    currentBlueValue = blueValue;
-    currentWhiteValue = whiteValue;
+    currentRedValue = newRedValue;
+    currentGreenValue = newGreenValue;
+    currentBlueValue = newBlueValue;
+    currentWhiteValue = newWhiteValue;
 
-    analogWrite(PIN_LED_RED, currentRedValue);
-    analogWrite(PIN_LED_GREEN, currentGreenValue);
-    analogWrite(PIN_LED_BLUE, currentBlueValue);
-    analogWrite(PIN_LED_WHITE, currentWhiteValue);
+    analogWrite(PIN_LED_RED, round(currentRedValue));
+    analogWrite(PIN_LED_GREEN, round(currentGreenValue));
+    analogWrite(PIN_LED_BLUE, round(currentBlueValue));
+    analogWrite(PIN_LED_WHITE, round(currentWhiteValue));
 }
 
 uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
@@ -392,9 +388,9 @@ uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brig
     return map(colorValue, 0, 255, 0, brigthnessValue);
 }
 
-float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endValue)
+float calculateValueChangePerStep(const float startValue, const float endValue)
 {
-    return ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
+    return (endValue - startValue) / (float) crossfadeSteps;
 }
 
 void publishState()
@@ -426,6 +422,7 @@ void loop()
 {
     connectMQTT();
     mqttClient.loop();
+    updateTransitionAnimationIfNecessary();
 }
 
 void connectMQTT()
@@ -457,5 +454,23 @@ void connectMQTT()
             blinkStatusLED(3);
             delay(500);
         }
+    }
+}
+
+void updateTransitionAnimationIfNecessary()
+{
+    const bool animationStillRunning = remainingCrossfadeSteps > 0;
+    const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > CROSSFADE_DELAY_MICROSECONDS;
+
+    if (animationStillRunning && animationUpdateNecessary)
+    {
+        const float newRedValue = currentRedValue + valueChangePerCrossfadeStepRed;
+        const float newGreenValue = currentGreenValue + valueChangePerCrossfadeStepGreen;
+        const float newBlueValue = currentBlueValue + valueChangePerCrossfadeStepBlue;
+        const float newWhiteValue = currentWhiteValue + valueChangePerCrossfadeStepWhite;
+        showGivenColorImmediately(newRedValue, newGreenValue, newBlueValue, newWhiteValue);
+
+        lastTransitionAnimationUpdate = micros();
+        remainingCrossfadeSteps--;
     }
 }
