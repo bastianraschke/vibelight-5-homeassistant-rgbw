@@ -4,7 +4,7 @@
 
 #include "config.h"
 
-#define FIRMWARE_VERSION                        "5.0.0"
+#define FIRMWARE_VERSION  "5.0.0"
 
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
 PubSubClient mqttClient = PubSubClient(secureWifiClient);
@@ -233,7 +233,6 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
         // TODO: Get from payload
         transitionEffectEnabled = true;
 
-
     // if (root.containsKey("transition")) {
     //   transitionTime = root["transition"];
     // }
@@ -431,6 +430,13 @@ void loop()
 
 void connectMQTT()
 {
+    if (mqttClient.connected() == true)
+    {
+        return ;
+    }
+
+    Serial.printf("connectMQTT(): Connecting to MQTT broker '%s:%i'...\n", MQTT_SERVER, MQTT_PORT);
+
     while (mqttClient.connected() == false)
     {
         Serial.println("connectMQTT(): Connecting...");
@@ -447,13 +453,9 @@ void connectMQTT()
         }
         else
         {
-            Serial.printf("connectMQTT(): Connection failed! Error code: %i\n", mqttClient.state());
-
-            // Blink 3 times for indication of failed MQTT connection
+            Serial.printf("connectMQTT(): Connection failed with error code %i. Try again...\n", mqttClient.state());
             blinkStatusLED(3);
-
-            Serial.println("connectMQTT(): Try again in 1 second...");
-            delay(1000);
+            delay(500);
         }
     }
 }
