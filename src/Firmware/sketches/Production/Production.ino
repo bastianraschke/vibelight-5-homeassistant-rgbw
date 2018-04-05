@@ -49,12 +49,14 @@ uint8_t transitionAnimationEndBlueValue = 0;
 uint8_t transitionAnimationEndWhiteValue = 0;
 
 bool transitionAnimationRunning = false;
-
 unsigned long lastTransitionAnimationUpdate = 0;
+
 int transitionAnimationStepDelayMicroseconds;
 
-const uint8_t TRANSITION_ANIMATION_STEPCOUNT = 255;
-uint8_t remainingTransitionAnimationSteps = 0;
+const uint8_t TRANSITION_ANIMATION_STEPCOUNT = 256;
+
+// Will be counted [0..255]
+uint8_t transitionAnimationStepIndex = 0;
 
 /*
  * Setup
@@ -198,11 +200,30 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 }
 
 /*
-    Example payload (RGBW):
-    {"brightness": 120, "color": {"r": 255, "g": 0, "b": 0}, "white_value": 255, "transition": 5, "state": "ON"}
+    Example payload (RGB+W):
+    {
+      "state": "ON",
+      "color": {
+        "b": 0,
+        "g": 0,
+        "r": 255
+      },
+      "white_value": 255
+      "brightness": 120,
+      "transition": 5,
+    }
 
     Example payload (RGB):
-    {"brightness": 120, "color": {"r": 255, "g": 0, "b": 0}, "transition": 5, "state": "ON"}
+    {
+      "state": "ON",
+      "color": {
+        "b": 0,
+        "g": 0,
+        "r": 255
+      },
+      "brightness": 120,
+      "transition": 5,
+    }
 */
 bool updateValuesAccordingJsonMessage(char* jsonPayload)
 {
@@ -262,8 +283,8 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
         }
 
         #if DEBUG_LEVEL >= 1
-            Serial.print(F("updateValuesAccordingJsonMessage(): The light was changed to: "));
-            Serial.print(F("stateOnOff = "));
+            Serial.print(F("updateValuesAccordingJsonMessage(): The light was changed to:"));
+            Serial.print(F(" stateOnOff = "));
             Serial.print(stateOnOff);
             Serial.print(F(", brightness = "));
             Serial.print(brightness);
@@ -320,29 +341,34 @@ uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brig
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds)
 {
-    // TODO: check if new != current
-
-    #if DEBUG_LEVEL >= 2
-        Serial.print(F("showGivenColor():"));
-        Serial.print(F(" redValue = "));
-        Serial.print(redValue);
-        Serial.print(F(", greenValue = "));
-        Serial.print(greenValue);
-        Serial.print(F(", blueValue = "));
-        Serial.print(blueValue);
-        Serial.print(F(", whiteValue = "));
-        Serial.print(whiteValue);
-        Serial.println();
-    #endif
-
-    if (transitionAnimationDurationInMicroseconds > 0)
+    if (redValue != currentRedValue && greenValue != currentGreenValue && blueValue != currentBlueValue && whiteValue != currentWhiteValue)
     {
-        startTransitionAnimation(redValue, greenValue, blueValue, whiteValue, transitionAnimationDurationInMicroseconds);
+        #if DEBUG_LEVEL >= 2
+            Serial.print(F("showGivenColor():"));
+            Serial.print(F(" redValue = "));
+            Serial.print(redValue);
+            Serial.print(F(", greenValue = "));
+            Serial.print(greenValue);
+            Serial.print(F(", blueValue = "));
+            Serial.print(blueValue);
+            Serial.print(F(", whiteValue = "));
+            Serial.print(whiteValue);
+            Serial.println();
+        #endif
+
+        if (transitionAnimationDurationInMicroseconds > 0)
+        {
+            startTransitionAnimation(redValue, greenValue, blueValue, whiteValue, transitionAnimationDurationInMicroseconds);
+        }
+        else
+        {
+            cancelTransitionAnimation();
+            showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
+        }
     }
     else
     {
-        cancelTransitionAnimation();
-        showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
+        Serial.print(F("showGivenColor(): The given color is still the current color - no need to change."));
     }
 }
 
@@ -359,8 +385,8 @@ void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, 
     transitionAnimationEndWhiteValue = whiteValue;
 
     transitionAnimationRunning = true;
+    transitionAnimationStepIndex = 0;
     transitionAnimationStepDelayMicroseconds = transitionAnimationDurationInMicroseconds / TRANSITION_ANIMATION_STEPCOUNT;
-    remainingTransitionAnimationSteps = TRANSITION_ANIMATION_STEPCOUNT;
 
     #if DEBUG_LEVEL >= 2
         Serial.print(F("startTransitionAnimation():"));
@@ -399,8 +425,8 @@ void cancelTransitionAnimation()
     transitionAnimationEndWhiteValue = 0;
 
     transitionAnimationRunning = false;
+    transitionAnimationStepIndex = 0;
     transitionAnimationStepDelayMicroseconds = 0;
-    remainingTransitionAnimationSteps = 0;
 }
 
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
@@ -495,32 +521,30 @@ void connectMQTT()
 
 void updateTransitionAnimationIfNecessary()
 {
-    // Check if the animation must be updated
-    if ((micros() - lastTransitionAnimationUpdate) > transitionAnimationStepDelayMicroseconds)
+    const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > transitionAnimationStepDelayMicroseconds;
+
+    if (animationUpdateNecessary)
     {
-        // TODO: fix last step
-        if (transitionAnimationRunning && remainingTransitionAnimationSteps > 0)
+        if (transitionAnimationRunning && transitionAnimationStepIndex < TRANSITION_ANIMATION_STEPCOUNT)
         {
-            const uint8_t redValue = getColorValueForStep(remainingTransitionAnimationSteps, transitionAnimationStartRedValue, transitionAnimationEndRedValue);
-            const uint8_t greenValue = getColorValueForStep(remainingTransitionAnimationSteps, transitionAnimationStartGreenValue, transitionAnimationEndGreenValue);
-            const uint8_t blueValue = getColorValueForStep(remainingTransitionAnimationSteps, transitionAnimationStartBlueValue, transitionAnimationEndBlueValue);
-            const uint8_t whiteValue = getColorValueForStep(remainingTransitionAnimationSteps, transitionAnimationStartWhiteValue, transitionAnimationEndWhiteValue);
+            const uint8_t redValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartRedValue, transitionAnimationEndRedValue);
+            const uint8_t greenValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartGreenValue, transitionAnimationEndGreenValue);
+            const uint8_t blueValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartBlueValue, transitionAnimationEndBlueValue);
+            const uint8_t whiteValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartWhiteValue, transitionAnimationEndWhiteValue);
             showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
 
             lastTransitionAnimationUpdate = micros();
-            remainingTransitionAnimationSteps--; 
+            transitionAnimationStepIndex++;
         }
         else
         {
             transitionAnimationRunning = false;
-            remainingTransitionAnimationSteps = 0;
+            transitionAnimationStepIndex = 0;
         }
     }
 }
 
-uint8_t getColorValueForStep(const uint8_t remainingSteps, const uint8_t startColorValue, const uint8_t endColorValue)
+uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startColorValue, const uint8_t endColorValue)
 {
-    // For safety the value is contained before writing to uint8_t, to be sure no signed values are written
-    const uint8_t unsignedColorValueForStep = constrain((endColorValue - startColorValue) - remainingSteps, 0, 255);
-    return unsignedColorValueForStep;
+    return (endColorValue - startColorValue) - ((TRANSITION_ANIMATION_STEPCOUNT - 1) - stepIndex);
 }
