@@ -11,7 +11,7 @@ PubSubClient mqttClient = PubSubClient(secureWifiClient);
 const int BUFFER_SIZE = JSON_OBJECT_SIZE(20);
 
 bool stateOnOff;
-bool transitionEffectEnabled;
+int transitionAnimationDurationInMicroseconds;
 uint8_t brightness;
 
 // These color values are the original state values:
@@ -29,7 +29,9 @@ float currentWhiteValue = 0;
 unsigned long lastTransitionAnimationUpdate = 0;
 
 const uint8_t crossfadeSteps = 255;
+
 uint8_t remainingCrossfadeSteps = 0;
+int transitionAnimationStepDelayMicroseconds;
 
 float valueChangePerCrossfadeStepRed = 0.0f;
 float valueChangePerCrossfadeStepGreen = 0.0f;
@@ -65,7 +67,7 @@ void setupLEDs()
 
     // Set initial values for LED
     stateOnOff = true;
-    transitionEffectEnabled = true;
+    transitionAnimationDurationInMicroseconds = DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS;
     brightness = 255;
 
     // For RGBW LED type show only the native white LEDs
@@ -96,7 +98,7 @@ void setupLEDs()
         Serial.println();
     #endif
 
-    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionEffectEnabled);
+    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionAnimationDurationInMicroseconds);
 }
 
 void setupWifi()
@@ -148,6 +150,9 @@ void setupMQTT()
 
 void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 {
+    // TODO: check why msges with payload > 87 bytes are not called back
+    // {"color": {"r": 255, "g": 100,"b": 100 }, "white_value": 50, "transition": 0          }
+
     if (!topic || !payload)
     {
         Serial.println("onMessageReceivedCallback(): Invalid argument (nullpointer) given!");
@@ -238,15 +243,15 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
             brightness = constrainBetweenByte(root["brightness"]);
         }
 
-        // TODO: Get from payload
-        transitionEffectEnabled = true;
-
-    // if (root.containsKey("transition")) {
-    //   transitionTime = root["transition"];
-    // }
-    // else {
-    //   transitionTime = 0;
-    // }
+        if (root.containsKey("transition"))
+        {
+            // The maximum value for "transition" is 60 seconds (thus we always stay in __INT_MAX__)
+            transitionAnimationDurationInMicroseconds = constrain(root["transition"], 0, 60) * 1000000;
+        }
+        else
+        {
+            transitionAnimationDurationInMicroseconds = DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS;
+        }
 
         #if DEBUG_LEVEL >= 1
             Serial.print(F("updateValuesAccordingJsonMessage(): The light was changed to: "));
@@ -262,8 +267,8 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
             Serial.print(newBlueValue);
             Serial.print(F(", newWhiteValue = "));
             Serial.print(newWhiteValue);
-            Serial.print(F(", transitionEffectEnabled = "));
-            Serial.print(transitionEffectEnabled);
+            Serial.print(F(", transitionAnimationDurationInMicroseconds = "));
+            Serial.print(transitionAnimationDurationInMicroseconds);
             Serial.println();
         #endif
 
@@ -284,18 +289,18 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
 
         if (stateOnOff == true)
         {
-            showGivenColor(newRedValueWithBrightness, newGreenValueWithBrightness, newBlueValueWithBrightness, newWhiteValueWithBrightness, transitionEffectEnabled);
+            showGivenColor(newRedValueWithBrightness, newGreenValueWithBrightness, newBlueValueWithBrightness, newWhiteValueWithBrightness, transitionAnimationDurationInMicroseconds);
         }
         else
         {
-            showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
+            showGivenColor(0, 0, 0, 0, transitionAnimationDurationInMicroseconds);
         }
     }
 
     return wasSuccessfulParsed;
 }
 
-void showGivenColor(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue, const bool transitionEffectEnabled)
+void showGivenColor(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue, const long transitionAnimationDurationInMicroseconds)
 {
     #if DEBUG_LEVEL >= 2
         Serial.print(F("showGivenColor(): newRedValue = "));
@@ -309,9 +314,9 @@ void showGivenColor(const float newRedValue, const float newGreenValue, const fl
         Serial.println();
     #endif
 
-    if (transitionEffectEnabled)
+    if (transitionAnimationDurationInMicroseconds > 0)
     {
-        startTransitionAnimation(newRedValue, newGreenValue, newBlueValue, newWhiteValue);
+        startTransitionAnimation(newRedValue, newGreenValue, newBlueValue, newWhiteValue, transitionAnimationDurationInMicroseconds);
     }
     else
     {
@@ -320,14 +325,14 @@ void showGivenColor(const float newRedValue, const float newGreenValue, const fl
     }
 }
 
-void startTransitionAnimation(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue)
+void startTransitionAnimation(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue, const long transitionAnimationDurationInMicroseconds)
 {
-    // Calculate step value to get from current shown color to new color
     valueChangePerCrossfadeStepRed = calculateValueChangePerStep(currentRedValue, newRedValue);
     valueChangePerCrossfadeStepGreen = calculateValueChangePerStep(currentGreenValue, newGreenValue);
     valueChangePerCrossfadeStepBlue = calculateValueChangePerStep(currentBlueValue, newBlueValue);
     valueChangePerCrossfadeStepWhite = calculateValueChangePerStep(currentWhiteValue, newWhiteValue);
 
+    transitionAnimationStepDelayMicroseconds = transitionAnimationDurationInMicroseconds / crossfadeSteps;
     remainingCrossfadeSteps = crossfadeSteps;
 
     #if DEBUG_LEVEL >= 2
@@ -351,6 +356,7 @@ void cancelRunningTransitionAnimation()
     valueChangePerCrossfadeStepWhite = 0.0f;
 
     remainingCrossfadeSteps = 0;
+    transitionAnimationStepDelayMicroseconds = 0;
 }
 
 void showGivenColorImmediately(const float newRedValue, const float newGreenValue, const float newBlueValue, const float newWhiteValue)
@@ -460,7 +466,7 @@ void connectMQTT()
 void updateTransitionAnimationIfNecessary()
 {
     const bool animationStillRunning = remainingCrossfadeSteps > 0;
-    const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > CROSSFADE_DELAY_MICROSECONDS;
+    const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > transitionAnimationDurationInMicroseconds;
 
     if (animationStillRunning && animationUpdateNecessary)
     {
@@ -469,6 +475,8 @@ void updateTransitionAnimationIfNecessary()
         const float newBlueValue = currentBlueValue + valueChangePerCrossfadeStepBlue;
         const float newWhiteValue = currentWhiteValue + valueChangePerCrossfadeStepWhite;
         showGivenColorImmediately(newRedValue, newGreenValue, newBlueValue, newWhiteValue);
+
+        // TODO: check if currentvalue == newvalue -> skip remaining steps
 
         lastTransitionAnimationUpdate = micros();
         remainingCrossfadeSteps--;
