@@ -7,7 +7,7 @@
 #define FIRMWARE_VERSION  "5.0.0"
 
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
-PubSubClient mqttClient = PubSubClient(secureWifiClient);
+PubSubClient mqttClient = PubSubClient(secureWifiClient, MQTT_SERVER_TLS_FINGERPRINT);
 const int BUFFER_SIZE = JSON_OBJECT_SIZE(20);
 
 bool stateOnOff;
@@ -444,7 +444,7 @@ void connectMQTT()
     {
         Serial.println("connectMQTT(): Connecting...");
 
-        if (mqttClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_SERVER_TLS_FINGERPRINT) == true)
+        if (mqttClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD) == true)
         {
             Serial.println("connectMQTT(): Connected to MQTT broker.");
 
