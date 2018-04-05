@@ -28,7 +28,7 @@ float currentWhiteValue = 0;
 
 unsigned long lastTransitionAnimationUpdate = 0;
 
-const uint8_t crossfadeSteps = 255;
+const uint8_t CROSSFADE_STEPCOUNT = 255;
 
 uint8_t remainingCrossfadeSteps = 0;
 int transitionAnimationStepDelayMicroseconds;
@@ -150,9 +150,6 @@ void setupMQTT()
 
 void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 {
-    // TODO: check why msges with payload > 87 bytes are not called back
-    // {"color": {"r": 255, "g": 100,"b": 100 }, "white_value": 50, "transition": 0          }
-
     if (!topic || !payload)
     {
         Serial.println("onMessageReceivedCallback(): Invalid argument (nullpointer) given!");
@@ -332,8 +329,8 @@ void startTransitionAnimation(const float newRedValue, const float newGreenValue
     valueChangePerCrossfadeStepBlue = calculateValueChangePerStep(currentBlueValue, newBlueValue);
     valueChangePerCrossfadeStepWhite = calculateValueChangePerStep(currentWhiteValue, newWhiteValue);
 
-    transitionAnimationStepDelayMicroseconds = transitionAnimationDurationInMicroseconds / crossfadeSteps;
-    remainingCrossfadeSteps = crossfadeSteps;
+    transitionAnimationStepDelayMicroseconds = transitionAnimationDurationInMicroseconds / CROSSFADE_STEPCOUNT;
+    remainingCrossfadeSteps = CROSSFADE_STEPCOUNT;
 
     #if DEBUG_LEVEL >= 2
         Serial.print(F("startTransitionAnimation(): valueChangePerCrossfadeStepRed = "));
@@ -344,6 +341,8 @@ void startTransitionAnimation(const float newRedValue, const float newGreenValue
         Serial.print(valueChangePerCrossfadeStepBlue);
         Serial.print(F(", valueChangePerCrossfadeStepWhite = "));
         Serial.print(valueChangePerCrossfadeStepWhite);
+        Serial.print(F(", transitionAnimationStepDelayMicroseconds = "));
+        Serial.print(transitionAnimationStepDelayMicroseconds);
         Serial.println();
     #endif
 }
@@ -396,7 +395,7 @@ uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brig
 
 float calculateValueChangePerStep(const float startValue, const float endValue)
 {
-    return (endValue - startValue) / (float) crossfadeSteps;
+    return (endValue - startValue) / (float) CROSSFADE_STEPCOUNT;
 }
 
 void publishState()
@@ -466,7 +465,7 @@ void connectMQTT()
 void updateTransitionAnimationIfNecessary()
 {
     const bool animationStillRunning = remainingCrossfadeSteps > 0;
-    const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > transitionAnimationDurationInMicroseconds;
+    const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > transitionAnimationStepDelayMicroseconds;
 
     if (animationStillRunning && animationUpdateNecessary)
     {
