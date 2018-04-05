@@ -126,22 +126,6 @@ void setupWifi()
     Serial.println(WiFi.localIP());
 }
 
-void blinkStatusLED(const int times)
-{
-    #ifdef PIN_STATUSLED
-        for (int i = 0; i < times; i++)
-        {
-            // Enable LED
-            digitalWrite(PIN_STATUSLED, LOW);
-            delay(100);
-
-            // Disable LED
-            digitalWrite(PIN_STATUSLED, HIGH);
-            delay(100);
-        }
-    #endif
-}
-
 void setupMQTT()
 {
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
@@ -383,21 +367,6 @@ void showGivenColorImmediately(const float newRedValue, const float newGreenValu
     analogWrite(PIN_LED_WHITE, round(currentWhiteValue));
 }
 
-uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
-{
-    return constrain(valueToConstrain, 0, 255);
-}
-
-uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brigthnessValue)
-{
-    return map(colorValue, 0, 255, 0, brigthnessValue);
-}
-
-float calculateValueChangePerStep(const float startValue, const float endValue)
-{
-    return (endValue - startValue) / (float) CROSSFADE_STEPCOUNT;
-}
-
 void publishState()
 {
     StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
@@ -421,6 +390,37 @@ void publishState()
     root.printTo(buffer, sizeof(buffer));
 
     mqttClient.publish(MQTT_CHANNEL_STATE, buffer, true);
+}
+
+void blinkStatusLED(const int times)
+{
+    #ifdef PIN_STATUSLED
+        for (int i = 0; i < times; i++)
+        {
+            // Enable LED
+            digitalWrite(PIN_STATUSLED, LOW);
+            delay(100);
+
+            // Disable LED
+            digitalWrite(PIN_STATUSLED, HIGH);
+            delay(100);
+        }
+    #endif
+}
+
+uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
+{
+    return constrain(valueToConstrain, 0, 255);
+}
+
+uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brigthnessValue)
+{
+    return map(colorValue, 0, 255, 0, brigthnessValue);
+}
+
+float calculateValueChangePerStep(const float startValue, const float endValue)
+{
+    return (endValue - startValue) / (float) CROSSFADE_STEPCOUNT;
 }
 
 void loop()
