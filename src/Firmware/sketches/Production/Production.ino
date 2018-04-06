@@ -551,15 +551,18 @@ void updateTransitionAnimationIfNecessary()
 uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startColorValue, const uint8_t endColorValue)
 {
     uint8_t colorValueForStepIndex;
+
+    const uint8_t lowerLimit = min(startColorValue, endColorValue);
     const uint8_t upperLimit = max(startColorValue, endColorValue);
+    const uint8_t constrainedStepIndex = constrain(stepIndex, lowerLimit, upperLimit);
 
     if (endColorValue > startColorValue)
     {
-        colorValueForStepIndex = ((float) (endColorValue - startColorValue) / (float) upperLimit) * stepIndex;
+        colorValueForStepIndex = ((float) (endColorValue - startColorValue) / (float) upperLimit) * constrainedStepIndex;
     }
     else if (startColorValue > endColorValue)
     {
-        colorValueForStepIndex = ((float) (startColorValue - endColorValue) / (float) upperLimit) * (upperLimit - stepIndex);
+        colorValueForStepIndex = ((float) (startColorValue - endColorValue) / (float) upperLimit) * (upperLimit - constrainedStepIndex);
     }
     else
     {
