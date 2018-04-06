@@ -556,13 +556,10 @@ uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startCo
     const uint8_t upperLimit = 255;
     const uint8_t constrainedStepIndex = constrain(stepIndex, lowerLimit, upperLimit);
 
-    if (endColorValue > startColorValue)
+    // Prevent division-by-zero
+    if (startColorValue != endColorValue)
     {
-        colorValueForStepIndex = ((float) (endColorValue - startColorValue) / (float) upperLimit) * constrainedStepIndex;
-    }
-    else if (startColorValue > endColorValue)
-    {
-        colorValueForStepIndex = ((float) (startColorValue - endColorValue) / (float) upperLimit) * (upperLimit - constrainedStepIndex);
+        colorValueForStepIndex = map(constrainedStepIndex, lowerLimit, upperLimit, startColorValue, endColorValue);
     }
     else
     {

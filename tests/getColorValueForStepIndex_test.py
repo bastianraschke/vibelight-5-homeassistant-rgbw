@@ -11,32 +11,32 @@ def constrain(x, a, b):
     else:
         return x
 
-# def mapValue(x, in_min, in_max, out_min, out_max):
-#     print("({} - {}) * ({} - {}) / ({} - {}) + {}".format(x ,in_min, out_max, out_min, in_max, in_min, out_min))
-#     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-
-# def getColorValueForStepIndex(i, s, e):
-#     lowerLimit = 0
-#     upperLimit = 255
-#     contrainedIndex = constrain(i, lowerLimit, upperLimit)
-
-#     ## Prevent division-by-zero
-#     if (s != e):
-#         return mapValue(contrainedIndex, lowerLimit, upperLimit, s, e)
-#     else:
-#         return lowerLimit
+def mapValue(x, in_min, in_max, out_min, out_max):
+    # print("({} - {}) * ({} - {}) / ({} - {}) + {}".format(x ,in_min, out_max, out_min, in_max, in_min, out_min))
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
 def getColorValueForStepIndex(i, s, e):
     lowerLimit = 0
     upperLimit = 255
     contrainedIndex = constrain(i, lowerLimit, upperLimit)
 
-    if (e > s):
-        return ((e - s) / upperLimit) * contrainedIndex
-    elif (s > e):
-        return ((s - e) / upperLimit) * (upperLimit - contrainedIndex)
+    ## Prevent division-by-zero
+    if (s != e):
+        return mapValue(contrainedIndex, lowerLimit, upperLimit, s, e)
     else:
-        return s
+        return lowerLimit
+
+# def getColorValueForStepIndex(i, s, e):
+#     lowerLimit = 0
+#     upperLimit = 255
+#     contrainedIndex = constrain(i, lowerLimit, upperLimit)
+
+#     if (e > s):
+#         return ((e - s) / upperLimit) * contrainedIndex
+#     elif (s > e):
+#         return ((s - e) / upperLimit) * (upperLimit - contrainedIndex)
+#     else:
+#         return s
 
 class GetColorValueForStepIndexTest(unittest.TestCase):
 
@@ -51,6 +51,11 @@ class GetColorValueForStepIndexTest(unittest.TestCase):
         self.assertEqual(255, getColorValueForStepIndex(i = 0, s = 255, e = 0))
         self.assertEqual(127, getColorValueForStepIndex(i = 128, s = 255, e = 0))
         self.assertEqual(0, getColorValueForStepIndex(i = 255, s = 255, e = 0))
+
+        ## Starting not with 0
+        self.assertEqual(224, getColorValueForStepIndex(i = 0, s = 224, e = 255))
+        self.assertAlmostEqual(239.560, getColorValueForStepIndex(i = 128, s = 224, e = 255), 2)
+        self.assertEqual(255, getColorValueForStepIndex(i = 255, s = 224, e = 255))
 
     def test_index_out_of_range(self):
 
