@@ -552,8 +552,8 @@ uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startCo
 {
     uint8_t colorValueForStepIndex;
 
-    const uint8_t lowerLimit = min(startColorValue, endColorValue);
-    const uint8_t upperLimit = max(startColorValue, endColorValue);
+    const uint8_t lowerLimit = 0;
+    const uint8_t upperLimit = 255;
     const uint8_t constrainedStepIndex = constrain(stepIndex, lowerLimit, upperLimit);
 
     if (endColorValue > startColorValue)
