@@ -76,6 +76,10 @@ void setup()
     Serial.println();
     Serial.println(buffer);
 
+    #ifdef PIN_STATUSLED
+        pinMode(PIN_STATUSLED, OUTPUT);
+    #endif
+
     setupWifi();
     setupLEDs();
     setupMQTT();
@@ -126,8 +130,20 @@ void setupLEDs()
 {
     Serial.println("setupLEDs(): Setup LEDs...");
 
-    #ifdef PIN_STATUSLED
-        pinMode(PIN_STATUSLED, OUTPUT);
+    #if PIN_LED_RED >= 0
+        pinMode(PIN_LED_RED, OUTPUT);
+    #endif
+
+    #if PIN_LED_GREEN >= 0
+        pinMode(PIN_LED_GREEN, OUTPUT);
+    #endif
+
+    #if PIN_LED_BLUE >= 0
+        pinMode(PIN_LED_BLUE, OUTPUT);
+    #endif
+
+    #if LED_TYPE == RGBW && PIN_LED_WHITE >= 0
+        pinMode(PIN_LED_WHITE, OUTPUT);
     #endif
 
     // Set initial values for LED
@@ -151,7 +167,7 @@ void setupLEDs()
         originalWhiteValue = 0;
     }
 
-    #if DEBUG_LEVEL >= 2
+    #if DEBUG_LEVEL >= 1
         Serial.print(F("setupLEDs():"));
         Serial.print(F(" originalRedValue = "));
         Serial.print(originalRedValue);
@@ -190,7 +206,7 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 
         payloadMessage[length] = '\0';
 
-        Serial.printf("onMessageReceivedCallback(): Message arrived on channel '%s': %s\n", topic, payloadMessage);
+        Serial.printf("onMessageReceivedCallback(): Received message on channel '%s': %s\n", topic, payloadMessage);
 
         if (updateValuesAccordingJsonMessage(payloadMessage))
         {
@@ -254,21 +270,16 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
             }
         }
 
-        uint8_t redValue;
-        uint8_t greenValue;
-        uint8_t blueValue;
-        uint8_t whiteValue;
-
         if (root.containsKey("color"))
         {
-            redValue = constrainBetweenByte(root["color"]["r"]);
-            greenValue = constrainBetweenByte(root["color"]["g"]);
-            blueValue = constrainBetweenByte(root["color"]["b"]);
+            originalRedValue = constrainBetweenByte(root["color"]["r"]);
+            originalGreenValue = constrainBetweenByte(root["color"]["g"]);
+            originalBlueValue = constrainBetweenByte(root["color"]["b"]);
         }
 
         if (LED_TYPE == RGBW && root.containsKey("white_value"))
         {
-            whiteValue = constrainBetweenByte(root["white_value"]);
+            originalWhiteValue = constrainBetweenByte(root["white_value"]);
         }
 
         if (root.containsKey("brightness"))
@@ -292,23 +303,18 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
             Serial.print(stateOnOff);
             Serial.print(F(", brightness = "));
             Serial.print(brightness);
-            Serial.print(F(", redValue = "));
-            Serial.print(redValue);
-            Serial.print(F(", greenValue = "));
-            Serial.print(greenValue);
-            Serial.print(F(", blueValue = "));
-            Serial.print(blueValue);
-            Serial.print(F(", whiteValue = "));
-            Serial.print(whiteValue);
+            Serial.print(F(", originalRedValue = "));
+            Serial.print(originalRedValue);
+            Serial.print(F(", originalGreenValue = "));
+            Serial.print(originalGreenValue);
+            Serial.print(F(", originalBlueValue = "));
+            Serial.print(originalBlueValue);
+            Serial.print(F(", originalWhiteValue = "));
+            Serial.print(originalWhiteValue);
             Serial.print(F(", transitionAnimationDurationInMicroseconds = "));
             Serial.print(transitionAnimationDurationInMicroseconds);
             Serial.println();
         #endif
-
-        originalRedValue = redValue;
-        originalGreenValue = greenValue;
-        originalBlueValue = blueValue;
-        originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
 
         const uint8_t newRedValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
         const uint8_t newGreenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
@@ -347,7 +353,7 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
 {
     if (redValue != currentRedValue || greenValue != currentGreenValue || blueValue != currentBlueValue || whiteValue != currentWhiteValue)
     {
-        #if DEBUG_LEVEL >= 2
+        #if DEBUG_LEVEL >= 1
             Serial.print(F("showGivenColor():"));
             Serial.print(F(" redValue = "));
             Serial.print(redValue);
@@ -392,7 +398,7 @@ void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, 
     transitionAnimationStepIndex = 0;
     transitionAnimationStepDelayMicroseconds = transitionAnimationDurationInMicroseconds / TRANSITION_ANIMATION_STEPCOUNT;
 
-    #if DEBUG_LEVEL >= 2
+    #if DEBUG_LEVEL >= 1
         Serial.print(F("startTransitionAnimation():"));
         Serial.print(F(" transitionAnimationStartRedValue = "));
         Serial.print(transitionAnimationStartRedValue);
@@ -453,10 +459,21 @@ void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue,
     currentBlueValue = blueValue;
     currentWhiteValue = whiteValue;
 
-    analogWrite(PIN_LED_RED, currentRedValue);
-    analogWrite(PIN_LED_GREEN, currentGreenValue);
-    analogWrite(PIN_LED_BLUE, currentBlueValue);
-    analogWrite(PIN_LED_WHITE, currentWhiteValue);
+    #if PIN_LED_RED >= 0
+        analogWrite(PIN_LED_RED, currentRedValue);
+    #endif
+
+    #if PIN_LED_GREEN >= 0
+        analogWrite(PIN_LED_GREEN, currentGreenValue);
+    #endif
+
+    #if PIN_LED_BLUE >= 0
+        analogWrite(PIN_LED_BLUE, currentBlueValue);
+    #endif
+
+    #if LED_TYPE == RGBW && PIN_LED_WHITE >= 0
+        analogWrite(PIN_LED_WHITE, currentWhiteValue);
+    #endif
 }
 
 void publishState()
@@ -469,7 +486,7 @@ void publishState()
     JsonObject& color = root.createNestedObject("color");
     color["r"] = originalRedValue;
     color["g"] = originalGreenValue;
-    color["b"] = originalWhiteValue;
+    color["b"] = originalBlueValue;
 
     if (LED_TYPE == RGBW)
     {
@@ -478,10 +495,11 @@ void publishState()
 
     root["brightness"] = brightness;
 
-    char buffer[root.measureLength() + 1];
-    root.printTo(buffer, sizeof(buffer));
+    char payloadMessage[root.measureLength() + 1];
+    root.printTo(payloadMessage, sizeof(payloadMessage));
 
-    mqttClient.publish(MQTT_CHANNEL_STATE, buffer, true);
+    Serial.printf("publishState(): Publish message on channel '%s': %s\n", MQTT_CHANNEL_STATE, payloadMessage);
+    mqttClient.publish(MQTT_CHANNEL_STATE, payloadMessage, true);
 }
 
 void loop()

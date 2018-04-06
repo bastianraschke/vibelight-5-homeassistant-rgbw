@@ -29,7 +29,7 @@ enum LEDType {
 #define MQTT_CHANNEL_STATE             "/vibelight/api/5/id/AAAABBBB/state/"
 #define MQTT_CHANNEL_COMMAND           "/vibelight/api/5/id/AAAABBBB/command/"
 
-// Uncomment if on the board is a onboard LED
+// Uncomment if on the board is an onboard LED
 #define PIN_STATUSLED                  LED_BUILTIN
 
 #define LED_TYPE                       RGB
@@ -43,9 +43,16 @@ enum LEDType {
 #define LED_BLUE_OFFSET                0
 #define LED_WHITE_OFFSET               0
 
-#define PIN_LED_RED                    14
-#define PIN_LED_GREEN                  13
-#define PIN_LED_BLUE                   12
-#define PIN_LED_WHITE                  11
+/**
+ * In this case a Wemos D1 mini was used (pin numbers equal to printed labels).
+ * Set to "-1" to disable a color channel.
+ *
+ * On the Wemos D1 mini the pin D4 can't be used for white channel because
+ * this port is used by the onboard status LED. Use "D0" instead.
+ */
+#define PIN_LED_RED                    D1
+#define PIN_LED_GREEN                  D2
+#define PIN_LED_BLUE                   D3
+#define PIN_LED_WHITE                  -1
 
-#define DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS    1500
+#define DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS    1000000
