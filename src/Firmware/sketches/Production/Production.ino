@@ -130,6 +130,8 @@ void setupLEDs()
 {
     Serial.println("setupLEDs(): Setup LEDs...");
 
+    analogWriteRange(255);
+
     #if PIN_LED_RED >= 0
         pinMode(PIN_LED_RED, OUTPUT);
     #endif
