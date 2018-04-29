@@ -17,6 +17,8 @@ enum LEDType {
 #define WIFI_PASSWORD                  ""
 
 #define MQTT_CLIENTID                  VIBELIGHT_NODE_ID
+
+// Put the host/IPv4 address of your MQTT broker here
 #define MQTT_SERVER                    ""
 
 // Use the SHA1 fingerprint of the server certificate (NOT the CA certificate) in the following format:
