@@ -11,7 +11,7 @@
 
 ## Project application
 
-On the following image you see this firmware used on a Wemos D1 Mini based RGBW controller to nicely light up my alcohol collection:
+Here you see the firmware used on a Wemos D1 Mini based RGBW controller to nicely light up my alcohol collection:
 
 <img alt="VibeLight 5.0 nicely lights up my alcohol collection" src="https://github.com/bastianraschke/vibelight-5-homeassistant-rgbw/blob/master/projectcover.jpg" width="650">
 
