@@ -9,7 +9,7 @@
 - Supports transitions for Home Assistant
 - Customizable color channel offsets for color correction
 
-<img alt="Example setup" src="https://sicherheitskritisch.de/images/TODO.jpg" width="600">
+<img alt="VibeLight 5.0 nicely lights up my alcohol collection" src="https://github.com/bastianraschke/vibelight-5-homeassistant-rgb/blob/Development/projectcover.jpg" width="600">
 
 ## Example configuration for Home Assistant
 
