@@ -4,7 +4,7 @@
 
 #include "config.h"
 
-#define FIRMWARE_VERSION  "5.0.0"
+#define FIRMWARE_VERSION  "5.1.0"
 
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
 PubSubClient mqttClient = PubSubClient(secureWifiClient, MQTT_SERVER_TLS_FINGERPRINT);
@@ -348,7 +348,10 @@ uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
 
 uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brightnessValue)
 {
-    return map(colorValue, 0, 255, 0, brightnessValue);
+    const uint8_t maximumBrightnessMappedFromPercentToByte = map(LED_MAX_BRIGHTNESS, 0, 100, 0, 255);
+    const uint8_t maximumRespectingBrightness = map(brightnessValue, 0, 255, 0, maximumBrightnessMappedFromPercentToByte);
+
+    return map(colorValue, 0, 255, 0, maximumRespectingBrightness);
 }
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds)

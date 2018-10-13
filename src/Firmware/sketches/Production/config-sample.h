@@ -45,12 +45,19 @@ enum LEDType {
 #define LED_BLUE_OFFSET                0
 #define LED_WHITE_OFFSET               0
 
+// Define maximum brightness value [0..100] e.g. to save energy or avoid overheating of LEDs
+#define LED_MAX_BRIGHTNESS             100
+
 /**
  * In this case a Wemos D1 mini was used (pin numbers equal to printed labels).
  * Set to "-1" to disable a color channel.
  *
  * On the Wemos D1 mini the pin D4 can't be used for white channel because
  * this port is used by the onboard status LED. Use "D0" instead.
+ *
+ * On the NodeMCU dev board the pin D0 can't be used for white channel because
+ * this port is used by the onboard status LED. Also the D4 can't be used
+ * because it is used by the ESP8266 module board LED. Use "D5" instead.
  */
 #define PIN_LED_RED                    D1
 #define PIN_LED_GREEN                  D2
