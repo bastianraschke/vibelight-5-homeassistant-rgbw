@@ -4,7 +4,7 @@
 
 #include "config.h"
 
-#define FIRMWARE_VERSION  "5.1.0"
+#define FIRMWARE_VERSION  "5.1.1"
 
 WiFiClientSecure secureWifiClient = WiFiClientSecure();
 PubSubClient mqttClient = PubSubClient(secureWifiClient, MQTT_SERVER_TLS_FINGERPRINT);
@@ -182,7 +182,17 @@ void setupLEDs()
         Serial.println();
     #endif
 
-    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionAnimationDurationInMicroseconds);
+    const uint8_t initialRedValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
+    const uint8_t initialGreenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
+    const uint8_t initialBlueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
+    const uint8_t initialWhiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
+
+    const uint8_t initialRedValueWithBrightness = mapColorValueWithBrightness(initialRedValueWithOffset, brightness);
+    const uint8_t initialGreenValueWithBrightness = mapColorValueWithBrightness(initialGreenValueWithOffset, brightness);
+    const uint8_t initialBlueValueWithBrightness = mapColorValueWithBrightness(initialBlueValueWithOffset, brightness);
+    const uint8_t initialWhiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(initialWhiteValueWithOffset, brightness) : 0;
+
+    showGivenColor(initialRedValueWithBrightness, initialGreenValueWithBrightness, initialBlueValueWithBrightness, initialWhiteValueWithBrightness, transitionAnimationDurationInMicroseconds);
 }
 
 void setupMQTT()
