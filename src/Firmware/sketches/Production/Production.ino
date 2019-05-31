@@ -66,8 +66,7 @@ int transitionAnimationStepDelayMicroseconds = 0;
  * Setup
  */
 
-void setup()
-{
+void setup() {
     Serial.begin(115200);
     delay(250);
 
@@ -85,8 +84,7 @@ void setup()
     setupMQTT();
 }
 
-void setupWifi()
-{
+void setupWifi() {
     Serial.printf("setupWifi(): Connecting to to Wi-Fi access point '%s'...\n", WIFI_SSID);
 
     // Do not store Wi-Fi config in SDK flash area
@@ -97,8 +95,7 @@ void setupWifi()
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    while (WiFi.status() != WL_CONNECTED)
-    {
+    while (WiFi.status() != WL_CONNECTED) {
         // Blink 2 times when connecting
         blinkStatusLED(2);
 
@@ -110,8 +107,7 @@ void setupWifi()
     Serial.println(WiFi.localIP());
 }
 
-void blinkStatusLED(const int times)
-{
+void blinkStatusLED(const int times) {
     #ifdef PIN_STATUSLED
         for (int i = 0; i < times; i++)
         {
@@ -126,8 +122,7 @@ void blinkStatusLED(const int times)
     #endif
 }
 
-void setupLEDs()
-{
+void setupLEDs() {
     Serial.println("setupLEDs(): Setup LEDs...");
 
     analogWriteRange(255);
@@ -154,15 +149,12 @@ void setupLEDs()
     brightness = 255;
 
     // For RGBW LED type show only the native white LEDs
-    if (LED_TYPE == RGBW)
-    {
+    if (LED_TYPE == RGBW) {
         originalRedValue = 0;
         originalGreenValue = 0;
         originalBlueValue = 0;
         originalWhiteValue = 255;
-    }
-    else
-    {
+    } else {
         originalRedValue = 255;
         originalGreenValue = 255;
         originalBlueValue = 255;
@@ -195,24 +187,18 @@ void setupLEDs()
     showGivenColor(initialRedValueWithBrightness, initialGreenValueWithBrightness, initialBlueValueWithBrightness, initialWhiteValueWithBrightness, transitionAnimationDurationInMicroseconds);
 }
 
-void setupMQTT()
-{
+void setupMQTT() {
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(onMessageReceivedCallback);
 }
 
-void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
-{
-    if (!topic || !payload)
-    {
+void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length) {
+    if (!topic || !payload) {
         Serial.println("onMessageReceivedCallback(): Invalid argument (nullpointer) given!");
-    }
-    else
-    {
+    } else {
         char payloadMessage[length + 1];
 
-        for (int i = 0; i < length; i++)
-        {
+        for (int i = 0; i < length; i++) {
             payloadMessage[i] = (char) payload[i];
         }
 
@@ -220,12 +206,9 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
 
         Serial.printf("onMessageReceivedCallback(): Received message on channel '%s': %s\n", topic, payloadMessage);
 
-        if (updateValuesAccordingJsonMessage(payloadMessage))
-        {
+        if (updateValuesAccordingJsonMessage(payloadMessage)) {
             publishState();
-        }
-        else
-        {
+        } else {
             Serial.println("onMessageReceivedCallback(): The payload could not be parsed as JSON!");
         }
     }
@@ -257,55 +240,41 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length)
       "transition": 5,
     }
 */
-bool updateValuesAccordingJsonMessage(char* jsonPayload)
-{
+bool updateValuesAccordingJsonMessage(char* jsonPayload) {
     bool wasSuccessfulParsed = true;
 
     StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
     JsonObject& root = jsonBuffer.parseObject(jsonPayload);
 
-    if (!root.success())
-    {
+    if (!root.success()) {
         wasSuccessfulParsed = false;
-    }
-    else
-    {
-        if (root.containsKey("state"))
-        {
-            if (strcmp(root["state"], "ON") == 0)
-            {
+    } else {
+        if (root.containsKey("state")) {
+            if (strcmp(root["state"], "ON") == 0) {
                 stateOnOff = true;
-            }
-            else if (strcmp(root["state"], "OFF") == 0)
-            {
+            } else if (strcmp(root["state"], "OFF") == 0) {
                 stateOnOff = false;
             }
         }
 
-        if (root.containsKey("color"))
-        {
+        if (root.containsKey("color")) {
             originalRedValue = constrainBetweenByte(root["color"]["r"]);
             originalGreenValue = constrainBetweenByte(root["color"]["g"]);
             originalBlueValue = constrainBetweenByte(root["color"]["b"]);
         }
 
-        if (LED_TYPE == RGBW && root.containsKey("white_value"))
-        {
+        if (LED_TYPE == RGBW && root.containsKey("white_value")) {
             originalWhiteValue = constrainBetweenByte(root["white_value"]);
         }
 
-        if (root.containsKey("brightness"))
-        {
+        if (root.containsKey("brightness")) {
             brightness = constrainBetweenByte(root["brightness"]);
         }
 
-        if (root.containsKey("transition"))
-        {
+        if (root.containsKey("transition")) {
             // The maximum value for "transition" is 60 seconds (thus we always stay in __INT_MAX__)
             transitionAnimationDurationInMicroseconds = constrain(root["transition"], 0, 60) * 1000000;
-        }
-        else
-        {
+        } else {
             transitionAnimationDurationInMicroseconds = DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS;
         }
 
@@ -338,12 +307,9 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
         const uint8_t newBlueValueWithBrightness = mapColorValueWithBrightness(newBlueValueWithOffset, brightness);
         const uint8_t newWhiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(newWhiteValueWithOffset, brightness) : 0;
 
-        if (stateOnOff == true)
-        {
+        if (stateOnOff == true) {
             showGivenColor(newRedValueWithBrightness, newGreenValueWithBrightness, newBlueValueWithBrightness, newWhiteValueWithBrightness, transitionAnimationDurationInMicroseconds);
-        }
-        else
-        {
+        } else {
             showGivenColor(0, 0, 0, 0, transitionAnimationDurationInMicroseconds);
         }
     }
@@ -351,23 +317,19 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload)
     return wasSuccessfulParsed;
 }
 
-uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
-{
+uint8_t constrainBetweenByte(const uint8_t valueToConstrain) {
     return constrain(valueToConstrain, 0, 255);
 }
 
-uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brightnessValue)
-{
+uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brightnessValue) {
     const uint8_t maximumBrightnessMappedFromPercentToByte = map(LED_MAX_BRIGHTNESS, 0, 100, 0, 255);
     const uint8_t maximumRespectingBrightness = map(brightnessValue, 0, 255, 0, maximumBrightnessMappedFromPercentToByte);
 
     return map(colorValue, 0, 255, 0, maximumRespectingBrightness);
 }
 
-void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds)
-{
-    if (redValue != currentRedValue || greenValue != currentGreenValue || blueValue != currentBlueValue || whiteValue != currentWhiteValue)
-    {
+void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds) {
+    if (redValue != currentRedValue || greenValue != currentGreenValue || blueValue != currentBlueValue || whiteValue != currentWhiteValue) {
         #if DEBUG_LEVEL >= 1
             Serial.print(F("showGivenColor():"));
             Serial.print(F(" redValue = "));
@@ -381,24 +343,18 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
             Serial.println();
         #endif
 
-        if (transitionAnimationDurationInMicroseconds > 0)
-        {
+        if (transitionAnimationDurationInMicroseconds > 0) {
             startTransitionAnimation(redValue, greenValue, blueValue, whiteValue, transitionAnimationDurationInMicroseconds);
-        }
-        else
-        {
+        } else {
             cancelTransitionAnimation();
             showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
         }
-    }
-    else
-    {
+    } else {
         Serial.println(F("showGivenColor(): The given color is still the current color - no need to change."));
     }
 }
 
-void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds)
-{
+void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds) {
     transitionAnimationStartRedValue = currentRedValue;
     transitionAnimationStartGreenValue = currentGreenValue;
     transitionAnimationStartBlueValue = currentBlueValue;
@@ -437,8 +393,7 @@ void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, 
     #endif
 }
 
-void cancelTransitionAnimation()
-{
+void cancelTransitionAnimation() {
     transitionAnimationStartRedValue = 0;
     transitionAnimationStartGreenValue = 0;
     transitionAnimationStartBlueValue = 0;
@@ -454,8 +409,7 @@ void cancelTransitionAnimation()
     transitionAnimationStepDelayMicroseconds = 0;
 }
 
-void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
-{
+void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue) {
     #if DEBUG_LEVEL >= 2
         Serial.print(F("showGivenColorImmediately():"));
         Serial.print(F(" redValue = "));
@@ -491,8 +445,7 @@ void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue,
     #endif
 }
 
-void publishState()
-{
+void publishState() {
     StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
     JsonObject& root = jsonBuffer.createObject();
 
@@ -503,8 +456,7 @@ void publishState()
     color["g"] = originalGreenValue;
     color["b"] = originalBlueValue;
 
-    if (LED_TYPE == RGBW)
-    {
+    if (LED_TYPE == RGBW) {
         root["white_value"] = originalWhiteValue;
     }
 
@@ -517,28 +469,23 @@ void publishState()
     mqttClient.publish(MQTT_CHANNEL_STATE, payloadMessage, true);
 }
 
-void loop()
-{
+void loop() {
     connectMQTT();
     mqttClient.loop();
     updateTransitionAnimationIfNecessary();
 }
 
-void connectMQTT()
-{
-    if (mqttClient.connected() == true)
-    {
+void connectMQTT() {
+    if (mqttClient.connected() == true) {
         return ;
     }
 
     Serial.printf("connectMQTT(): Connecting to MQTT broker '%s:%i'...\n", MQTT_SERVER, MQTT_PORT);
 
-    while (mqttClient.connected() == false)
-    {
+    while (mqttClient.connected() == false) {
         Serial.println("connectMQTT(): Connecting...");
 
-        if (mqttClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD) == true)
-        {
+        if (mqttClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD) == true) {
             Serial.println("connectMQTT(): Connected to MQTT broker.");
 
             // (Re)subscribe on topics
@@ -546,9 +493,7 @@ void connectMQTT()
 
             // Initially publish current state
             publishState();
-        }
-        else
-        {
+        } else {
             Serial.printf("connectMQTT(): Connection failed with error code %i. Try again...\n", mqttClient.state());
             blinkStatusLED(3);
             delay(500);
@@ -556,14 +501,11 @@ void connectMQTT()
     }
 }
 
-void updateTransitionAnimationIfNecessary()
-{
+void updateTransitionAnimationIfNecessary() {
     const bool animationUpdateNecessary = (micros() - lastTransitionAnimationUpdate) > transitionAnimationStepDelayMicroseconds;
 
-    if (animationUpdateNecessary)
-    {
-        if (transitionAnimationRunning && transitionAnimationStepIndex < TRANSITION_ANIMATION_STEPCOUNT)
-        {
+    if (animationUpdateNecessary) {
+        if (transitionAnimationRunning && transitionAnimationStepIndex < TRANSITION_ANIMATION_STEPCOUNT) {
             const uint8_t redValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartRedValue, transitionAnimationEndRedValue);
             const uint8_t greenValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartGreenValue, transitionAnimationEndGreenValue);
             const uint8_t blueValue = getColorValueForStepIndex(transitionAnimationStepIndex, transitionAnimationStartBlueValue, transitionAnimationEndBlueValue);
@@ -572,17 +514,14 @@ void updateTransitionAnimationIfNecessary()
 
             lastTransitionAnimationUpdate = micros();
             transitionAnimationStepIndex++;
-        }
-        else
-        {
+        } else {
             transitionAnimationRunning = false;
             transitionAnimationStepIndex = 0;
         }
     }
 }
 
-uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startColorValue, const uint8_t endColorValue)
-{
+uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startColorValue, const uint8_t endColorValue) {
     uint8_t colorValueForStepIndex;
 
     const uint8_t lowerLimit = 0;
@@ -590,12 +529,9 @@ uint8_t getColorValueForStepIndex(const uint8_t stepIndex, const uint8_t startCo
     const uint8_t constrainedStepIndex = constrain(stepIndex, lowerLimit, upperLimit);
 
     // Prevent division-by-zero
-    if (startColorValue != endColorValue)
-    {
+    if (startColorValue != endColorValue) {
         colorValueForStepIndex = map(constrainedStepIndex, lowerLimit, upperLimit, startColorValue, endColorValue);
-    }
-    else
-    {
+    } else {
         colorValueForStepIndex = startColorValue;
     }
 
