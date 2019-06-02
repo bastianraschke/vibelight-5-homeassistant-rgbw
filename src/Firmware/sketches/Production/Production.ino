@@ -10,8 +10,8 @@ WiFiClientSecure secureWifiClient = WiFiClientSecure();
 PubSubClient mqttClient = PubSubClient(secureWifiClient, MQTT_SERVER_TLS_FINGERPRINT);
 const int BUFFER_SIZE = JSON_OBJECT_SIZE(20);
 
-bool stateOnOff;
-int transitionAnimationDurationInMicroseconds = DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS;
+bool stateOnOff = false;
+int transitionDuration = 0;
 uint8_t brightness = 0;
 
 /*
@@ -145,7 +145,7 @@ void setupLEDs() {
 
     // Set initial values for LED
     stateOnOff = true;
-    transitionAnimationDurationInMicroseconds = DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS;
+    transitionDuration = LED_TRANSITION_DURATION;
     brightness = 255;
 
     // For RGBW LED type show only the native white LEDs
@@ -184,7 +184,7 @@ void setupLEDs() {
     const uint8_t initialBlueValueWithBrightness = mapColorValueWithBrightness(initialBlueValueWithOffset, brightness);
     const uint8_t initialWhiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(initialWhiteValueWithOffset, brightness) : 0;
 
-    showGivenColor(initialRedValueWithBrightness, initialGreenValueWithBrightness, initialBlueValueWithBrightness, initialWhiteValueWithBrightness, transitionAnimationDurationInMicroseconds);
+    showGivenColor(initialRedValueWithBrightness, initialGreenValueWithBrightness, initialBlueValueWithBrightness, initialWhiteValueWithBrightness, transitionDuration);
 }
 
 void setupMQTT() {
@@ -273,9 +273,9 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
 
         if (root.containsKey("transition")) {
             // The maximum value for "transition" is 60 seconds (thus we always stay in __INT_MAX__)
-            transitionAnimationDurationInMicroseconds = constrain(root["transition"], 0, 60) * 1000000;
+            transitionDuration = constrain(root["transition"], 0, 60) * 1000000;
         } else {
-            transitionAnimationDurationInMicroseconds = DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS;
+            transitionDuration = LED_TRANSITION_DURATION;
         }
 
         #if DEBUG_LEVEL >= 1
@@ -292,8 +292,8 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
             Serial.print(originalBlueValue);
             Serial.print(F(", originalWhiteValue = "));
             Serial.print(originalWhiteValue);
-            Serial.print(F(", transitionAnimationDurationInMicroseconds = "));
-            Serial.print(transitionAnimationDurationInMicroseconds);
+            Serial.print(F(", transitionDuration = "));
+            Serial.print(transitionDuration);
             Serial.println();
         #endif
 
@@ -308,9 +308,9 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
         const uint8_t newWhiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(newWhiteValueWithOffset, brightness) : 0;
 
         if (stateOnOff == true) {
-            showGivenColor(newRedValueWithBrightness, newGreenValueWithBrightness, newBlueValueWithBrightness, newWhiteValueWithBrightness, transitionAnimationDurationInMicroseconds);
+            showGivenColor(newRedValueWithBrightness, newGreenValueWithBrightness, newBlueValueWithBrightness, newWhiteValueWithBrightness, transitionDuration);
         } else {
-            showGivenColor(0, 0, 0, 0, transitionAnimationDurationInMicroseconds);
+            showGivenColor(0, 0, 0, 0, transitionDuration);
         }
     }
 
@@ -328,7 +328,7 @@ uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brig
     return map(colorValue, 0, 255, 0, maximumRespectingBrightness);
 }
 
-void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds) {
+void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionDuration) {
     if (redValue != currentRedValue || greenValue != currentGreenValue || blueValue != currentBlueValue || whiteValue != currentWhiteValue) {
         #if DEBUG_LEVEL >= 1
             Serial.print(F("showGivenColor():"));
@@ -343,8 +343,8 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
             Serial.println();
         #endif
 
-        if (transitionAnimationDurationInMicroseconds > 0) {
-            startTransitionAnimation(redValue, greenValue, blueValue, whiteValue, transitionAnimationDurationInMicroseconds);
+        if (transitionDuration > 0) {
+            startTransitionAnimation(redValue, greenValue, blueValue, whiteValue, transitionDuration);
         } else {
             cancelTransitionAnimation();
             showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
@@ -354,7 +354,7 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
     }
 }
 
-void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionAnimationDurationInMicroseconds) {
+void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const long transitionDuration) {
     transitionAnimationStartRedValue = currentRedValue;
     transitionAnimationStartGreenValue = currentGreenValue;
     transitionAnimationStartBlueValue = currentBlueValue;
@@ -367,7 +367,7 @@ void startTransitionAnimation(const uint8_t redValue, const uint8_t greenValue, 
 
     transitionAnimationRunning = true;
     transitionAnimationStepIndex = 0;
-    transitionAnimationStepDelayMicroseconds = transitionAnimationDurationInMicroseconds / TRANSITION_ANIMATION_STEPCOUNT;
+    transitionAnimationStepDelayMicroseconds = transitionDuration / TRANSITION_ANIMATION_STEPCOUNT;
 
     #if DEBUG_LEVEL >= 1
         Serial.print(F("startTransitionAnimation():"));

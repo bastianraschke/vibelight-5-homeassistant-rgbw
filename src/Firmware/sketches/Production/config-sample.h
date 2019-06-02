@@ -48,6 +48,9 @@ enum LEDType {
 // Define maximum brightness value [0..100] e.g. to save energy or avoid overheating of LEDs
 #define LED_MAX_BRIGHTNESS             100
 
+// Default transition duration microseconds
+#define LED_TRANSITION_DURATION        800000
+
 /**
  * In this case a Wemos D1 mini was used (pin numbers equal to printed labels).
  * Set to "-1" to disable a color channel.
@@ -63,5 +66,3 @@ enum LEDType {
 #define PIN_LED_GREEN                  D2
 #define PIN_LED_BLUE                   D3
 #define PIN_LED_WHITE                  -1
-
-#define DEFAULT_TRANSITION_ANIMATION_DURATION_MICROSECONDS    800000
