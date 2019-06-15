@@ -405,7 +405,7 @@ class WS2812BStrip : public LEDStrip {
         }
 
         virtual void showTransitionColor(const Color transitionStateColor) {
-            const uint32_t colorInteger = neopixelStrip.Color(transitionStateColor.red, transitionStateColor.green, transitionStateColor.blue, transitionStateColor.white);
+            const uint32_t colorInteger = colorToInteger(transitionStateColor);
             neopixelStrip.fill(colorInteger, 0, neopixelStrip.numPixels());
             neopixelStrip.show();
         }
