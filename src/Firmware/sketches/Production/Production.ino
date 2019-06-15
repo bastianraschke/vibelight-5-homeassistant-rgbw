@@ -217,8 +217,7 @@ class LEDStrip {
         }
 
         void showEffect() {
-            // Always reset animation state when new effect is set to be sure it starts always the same
-            resetAnimationStates();
+            animationRunning = false;
 
             switch(effect) {
                 case RAINBOW:
@@ -230,7 +229,7 @@ class LEDStrip {
                     infinityAnimation = true;
                     break;
                 case LASERSCANNER:
-                    animationStepDelay = 2000;
+                    animationStepDelay = 5000;
                     infinityAnimation = true;
                     break;
                 case NONE:
@@ -741,7 +740,6 @@ void publishState() {
     if (ledStrip->getIsWhiteSupported()) {
         root["white_value"] = color.white;
     }
-
 
     uint8_t brightness;
 
