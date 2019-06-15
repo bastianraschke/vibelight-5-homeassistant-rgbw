@@ -32,24 +32,23 @@ class LEDStrip {
 
         void setState(const bool state) {
             this->state = state;
-
-            // TODO set black
+            updateColorRelatedValues();
         }
 
         void setColor(const Color color) {
-            originalColor = Color {
+            this->color = Color {
                 constrainBetweenByte(color.red),
                 constrainBetweenByte(color.green),
                 constrainBetweenByte(color.blue),
                 isWhiteSupported ? constrainBetweenByte(color.white) : 0
             };
 
-            updateDesiredColor();
+            updateColorRelatedValues();
         }
 
         void setBrightness(const uint8_t brightness) {
             this->brightness = brightness;
-            updateDesiredColor();
+            updateColorRelatedValues();
         }
 
         void setTransitionDuration(const uint32_t transitionDuration) {
@@ -104,7 +103,7 @@ class LEDStrip {
         }
 
         Color getColor() {
-            return originalColor;
+            return color;
         }
 
         uint8_t getBrightness() {
@@ -129,18 +128,17 @@ class LEDStrip {
          */
 
         bool state = false;
+        Color color = {0, 0, 0, 0};
         uint8_t brightness = 0;
         uint32_t transitionDuration = LED_TRANSITION_DURATION;
         Effect effect = NONE;
 
         /*
-         * Color states
+         * Transition state colors
          */
 
-        Color originalColor = {0, 0, 0, 0};
-
-        Color previousColor = {0, 0, 0, 0};
-        Color desiredColor = {0, 0, 0, 0};
+        Color transitionBeginColor = {0, 0, 0, 0};
+        Color transitionFinishColor = {0, 0, 0, 0};
 
         /*
          * Animation states
@@ -156,16 +154,16 @@ class LEDStrip {
         uint8_t animationStepIndex = 0;
         uint32_t animationStepDelay = 10000;
 
-        Color calculateAnimationStateColor(const uint8_t animationIndex, const Color startColor, const Color endColor) {
+        Color calculateTransitionStateColor(const uint8_t animationIndex, const Color startColor, const Color endColor) {
             return Color {
-                calculateAnimationStateValue(animationStepIndex, startColor.red, endColor.red),
-                calculateAnimationStateValue(animationStepIndex, startColor.green, endColor.green),
-                calculateAnimationStateValue(animationStepIndex, startColor.blue, endColor.blue),
-                calculateAnimationStateValue(animationStepIndex, startColor.white, endColor.white)
+                calculateTransitionStateColorValue(animationStepIndex, startColor.red, endColor.red),
+                calculateTransitionStateColorValue(animationStepIndex, startColor.green, endColor.green),
+                calculateTransitionStateColorValue(animationStepIndex, startColor.blue, endColor.blue),
+                calculateTransitionStateColorValue(animationStepIndex, startColor.white, endColor.white)
             };
         }
 
-        uint8_t calculateAnimationStateValue(const uint8_t animationIndex, const uint8_t startValue, const uint8_t endValue) {
+        uint8_t calculateTransitionStateColorValue(const uint8_t animationIndex, const uint8_t startValue, const uint8_t endValue) {
             uint8_t animationStateValue;
 
             // Prevent division-by-zero
@@ -213,18 +211,22 @@ class LEDStrip {
             return isEffectSupported;
         }
 
-        void updateDesiredColor() {
-            const uint8_t ofsettedRedColor = constrainBetweenByte(originalColor.red + colorCorrectionOffset.red);
-            const uint8_t ofsettedGreenColor = constrainBetweenByte(originalColor.green + colorCorrectionOffset.green);
-            const uint8_t ofsettedBlueColor = constrainBetweenByte(originalColor.blue + colorCorrectionOffset.blue);
-            const uint8_t ofsettedWhiteColor = constrainBetweenByte(originalColor.white + colorCorrectionOffset.white);
+        void updateColorRelatedValues() {
+            if (state) {
+                const uint8_t offsettedRedColor = constrainBetweenByte(color.red + colorCorrectionOffset.red);
+                const uint8_t offsettedGreenColor = constrainBetweenByte(color.green + colorCorrectionOffset.green);
+                const uint8_t offsettedBlueColor = constrainBetweenByte(color.blue + colorCorrectionOffset.blue);
+                const uint8_t offsettedWhiteColor = constrainBetweenByte(color.white + colorCorrectionOffset.white);
 
-            desiredColor = Color {
-                calculateColorValueWithBrightness(ofsettedRedColor),
-                calculateColorValueWithBrightness(ofsettedGreenColor),
-                calculateColorValueWithBrightness(ofsettedBlueColor),
-                calculateColorValueWithBrightness(ofsettedWhiteColor)
-            };
+                transitionFinishColor = Color {
+                    calculateColorValueWithBrightness(offsettedRedColor),
+                    calculateColorValueWithBrightness(offsettedGreenColor),
+                    calculateColorValueWithBrightness(offsettedBlueColor),
+                    calculateColorValueWithBrightness(offsettedWhiteColor)
+                };
+            } else {
+                transitionFinishColor = Color {0, 0, 0, 0};
+            }
         }
 
         uint8_t calculateColorValueWithBrightness(const uint8_t colorValue) {
@@ -385,28 +387,25 @@ class WS2812BStrip : public LEDStrip {
         }
 
         virtual void updateColor() {
-            const Color animationStateColor = calculateAnimationStateColor(animationStepIndex, previousColor, desiredColor);
+            const Color transitionStateColor = calculateTransitionStateColor(animationStepIndex, transitionBeginColor, transitionFinishColor);
 
-            // Serial.print("updateColor animationStateColor = ");
+            // Serial.print("updateColor transitionStateColor = ");
             // Serial.print(" r = ");
-            // Serial.print(animationStateColor.red);
+            // Serial.print(transitionStateColor.red);
             // Serial.print(" g = ");
-            // Serial.print(animationStateColor.green);
+            // Serial.print(transitionStateColor.green);
             // Serial.print(" b = ");
-            // Serial.print(animationStateColor.blue);
+            // Serial.print(transitionStateColor.blue);
             // Serial.print(" w = ");
-            // Serial.print(animationStateColor.white);
+            // Serial.print(transitionStateColor.white);
 
-            // TODO: Use `fill` instead:
-            for (int i = 0; i < neopixelStrip.numPixels(); i++) {
-                neopixelStrip.setPixelColor(i, animationStateColor.red, animationStateColor.green, animationStateColor.blue, animationStateColor.white);
-            }
-
+            const uint32_t transitionStateColorInteger = neopixelStrip.Color(transitionStateColor.red, transitionStateColor.green, transitionStateColor.blue, transitionStateColor.white);
+            neopixelStrip.fill(transitionStateColorInteger, 0, neopixelStrip.numPixels());
             neopixelStrip.show();
 
-            // On last step update previous color
+            // On last step update transition start color for next transition
             if (animationStepIndex == ANIMATION_STEP_COUNT - 1) {
-                previousColor = animationStateColor;
+                transitionBeginColor = transitionStateColor;
             }
         }
 };
@@ -450,23 +449,28 @@ class CathodeStrip : public LEDStrip {
         }
 
         virtual void updateColor() {
-            /*
+            const Color transitionStateColor = calculateTransitionStateColor(animationStepIndex, transitionBeginColor, transitionFinishColor);
+
             if (pinRed >= 0) {
-                analogWrite(pinRed, color.red);
+                analogWrite(pinRed, transitionStateColor.red);
             }
 
             if (pinGreen >= 0) {
-                analogWrite(pinGreen, color.green);
+                analogWrite(pinGreen, transitionStateColor.green);
             }
 
             if (pinBlue >= 0) {
-                analogWrite(pinBlue, color.blue);
+                analogWrite(pinBlue, transitionStateColor.blue);
             }
 
             if (pinWhite >= 0 && isWhiteSupported) {
-                analogWrite(pinWhite, color.white);
+                analogWrite(pinWhite, transitionStateColor.white);
             }
-            */
+
+            // On last step update transition start color for next transition
+            if (animationStepIndex == ANIMATION_STEP_COUNT - 1) {
+                transitionBeginColor = transitionStateColor;
+            }
         }
 
         virtual void updateRainbowAnimation() {
@@ -693,7 +697,7 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
 
         #if DEBUG_LEVEL >= 1
             Serial.print(F("updateValuesAccordingJsonMessage(): The light was changed to:"));
-            Serial.print(F(" stateOnOff = "));
+            Serial.print(F(" state = "));
             Serial.print(ledStrip->getState());
             Serial.print(F(", brightness = "));
             Serial.print(ledStrip->getBrightness());
@@ -722,10 +726,18 @@ void publishState() {
     StaticJsonBuffer<JSON_BUFFER_SIZE> jsonBuffer;
     JsonObject& root = jsonBuffer.createObject();
 
-    const bool stateOnOff = ledStrip->getState();
-    root["state"] = (stateOnOff == true) ? "ON" : "OFF";
+    const bool state = ledStrip->getState();
+    root["state"] = state ? "ON" : "OFF";
 
-    const Color color = ledStrip->getColor();
+    Color color;
+
+    // If state is off, expose off color instead of real state
+    if (state) {
+        color = ledStrip->getColor();
+    } else {
+        color = Color {0, 0, 0, 0};
+    }
+
     JsonObject& jsonColor = root.createNestedObject("color");
     jsonColor["r"] = color.red;
     jsonColor["g"] = color.green;
@@ -735,7 +747,16 @@ void publishState() {
         root["white_value"] = color.white;
     }
 
-    const uint8_t brightness = ledStrip->getBrightness();
+
+    uint8_t brightness;
+
+    // If state is off, expose off brightness instead of real state
+    if (state) {
+        brightness = ledStrip->getBrightness();
+    } else {
+        brightness = 0;
+    }
+
     root["brightness"] = brightness;
 
     const Effect effect = ledStrip->getEffect();
