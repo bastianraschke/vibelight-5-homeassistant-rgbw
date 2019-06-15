@@ -1,7 +1,4 @@
-enum LEDType {
-    RGB,
-    RGBW
-};
+#include "types.h"
 
 /*
  * Configuration
@@ -34,7 +31,8 @@ enum LEDType {
 // Uncomment if on the board is an onboard LED
 #define PIN_STATUSLED                  LED_BUILTIN
 
-#define LED_TYPE                       RGB
+#define LED_TYPE                       WS2812B
+#define LED_CAPABILITY                 RGB
 
 /*
  * Define some optional offsets for color channels in the range 0..255
@@ -46,23 +44,34 @@ enum LEDType {
 #define LED_WHITE_OFFSET               0
 
 // Define maximum brightness value [0..100] e.g. to save energy or avoid overheating of LEDs
-#define LED_MAX_BRIGHTNESS             100
+#define LED_MAX_BRIGHTNESS             80
 
 // Default transition duration microseconds
 #define LED_TRANSITION_DURATION        800000
 
 /**
- * In this case a Wemos D1 mini was used (pin numbers equal to printed labels).
+ * Pin configuration for LED_TYPE: CATHODE (only used if configured above)
+ *
  * Set to "-1" to disable a color channel.
  *
- * On the Wemos D1 mini the pin D4 can't be used for white channel because
- * this port is used by the onboard status LED. Use "D0" instead.
+ * For Wemos D1 mini:
+ * The pin "D4" can't be used for white channel because this port is used
+ * by the onboard status LED. Use "D0" instead.
  *
- * On the NodeMCU dev board the pin D0 can't be used for white channel because
- * this port is used by the onboard status LED. Also the D4 can't be used
- * because it is used by the ESP8266 module board LED. Use "D5" instead.
+ * For NodeMCU:
+ * The pin "D0" can't be used for white channel because this port is used
+ * by the onboard status LED. Also the "D4" can't be used because it is used
+ * by the ESP8266 module board LED. Use "D5" instead.
  */
+
 #define PIN_LED_RED                    D1
 #define PIN_LED_GREEN                  D2
 #define PIN_LED_BLUE                   D3
 #define PIN_LED_WHITE                  -1
+
+/**
+ * Pin configuration for LED_TYPE: WS2812B (only used if configured above)
+ */
+
+#define PIN_LED_SIGNAL                 D1
+#define LED_COUNT                      60
