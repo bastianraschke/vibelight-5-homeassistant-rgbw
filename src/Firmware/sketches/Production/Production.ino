@@ -17,21 +17,18 @@ class LEDStrip {
     public:
         Effect supportedEffects[0] = {};
 
-        void setupIsWhiteSupported(const bool isWhiteSupported) {
-            this->isWhiteSupported = isWhiteSupported;
-        }
-
-        void setupColorCorrectionOffsets(const uint8_t redOffset, const uint8_t greenOffset, const uint8_t blueOffset, const uint8_t whiteOffset) {
+        void setup(const uint8_t redOffset, const uint8_t greenOffset, const uint8_t blueOffset, const uint8_t whiteOffset, const bool isWhiteSupported) {
             this->colorCorrectionOffset = Color {
                 constrainBetweenByte(redOffset),
                 constrainBetweenByte(greenOffset),
                 constrainBetweenByte(blueOffset),
                 isWhiteSupported ? constrainBetweenByte(whiteOffset) : 0
             };
-        }
 
-        // TODO: Merge setup methods`to avoid order related bugs?
-        virtual void setup() = 0;
+            this->isWhiteSupported = isWhiteSupported;
+
+            setupInternal();
+        }
 
         void setState(const bool state) {
             this->state = state;
@@ -200,6 +197,8 @@ class LEDStrip {
 
     private:
 
+        virtual void setupInternal() = 0;
+
         bool isEffectSupported(const Effect effect) {
             bool isEffectSupported = false;
 
@@ -307,12 +306,12 @@ class WS2812BStrip : public LEDStrip {
             neopixelStrip = Adafruit_NeoPixel(neopixelCount, neopixelPin, NEO_GRB + NEO_KHZ800);
         }
 
-        virtual void setup() {
-            neopixelStrip.begin();
-        }
-
     private:
         Adafruit_NeoPixel neopixelStrip;
+
+        virtual void setupInternal() {
+            neopixelStrip.begin();
+        }
 
         virtual void updateRainbowAnimation() {
             /*
@@ -424,7 +423,13 @@ class CathodeStrip : public LEDStrip {
             this->pinWhite = pinWhite;
         }
 
-        virtual void setup() {
+    private:
+        int8_t pinRed = -1;
+        int8_t pinGreen = -1;
+        int8_t pinBlue = -1;
+        int8_t pinWhite = -1;
+
+        virtual void setupInternal() {
             analogWriteRange(255);
 
             if (pinRed >= 0) {
@@ -443,12 +448,6 @@ class CathodeStrip : public LEDStrip {
                 pinMode(pinWhite, OUTPUT);
             }
         }
-
-    private:
-        int8_t pinRed = -1;
-        int8_t pinGreen = -1;
-        int8_t pinBlue = -1;
-        int8_t pinWhite = -1;
 
         virtual void updateColor() {
             /*
@@ -567,11 +566,7 @@ void setupLEDs() {
 
     const bool isWhiteSupported = LED_CAPABILITY == RGBW;
 
-    ledStrip->setupIsWhiteSupported(isWhiteSupported);
-    ledStrip->setupColorCorrectionOffsets(LED_RED_OFFSET, LED_GREEN_OFFSET, LED_BLUE_OFFSET, LED_WHITE_OFFSET);
-
-    // Setup light after setting white supported and color offsets
-    ledStrip->setup();
+    ledStrip->setup(LED_RED_OFFSET, LED_GREEN_OFFSET, LED_BLUE_OFFSET, LED_WHITE_OFFSET, isWhiteSupported);
 
     Color initialColor;
     const uint8_t initialBrightness = 255;
