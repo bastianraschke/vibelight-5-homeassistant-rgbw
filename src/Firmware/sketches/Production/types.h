@@ -37,20 +37,20 @@ Color integerToColor(const uint32_t color) {
 enum Effect {
     NONE,
     RAINBOW,
-    RAINBOW_CYCLE,
+    COLORLOOP,
     LASERSCANNER
 };
 
 #define EFFECT_STRING_NONE "none"
 #define EFFECT_STRING_RAINBOW "rainbow"
-#define EFFECT_STRING_RAINBOW_CYCLE "rainbowCycle" // TODO: Rename to colorloop
-#define EFFECT_STRING_LASERSCANNER "laserScanner"
+#define EFFECT_STRING_COLORLOOP "colorloop"
+#define EFFECT_STRING_LASERSCANNER "laserscanner"
 
 char* effectToStringRepresentation(enum Effect effect) {
     char* stringRepresentations[] = {
         EFFECT_STRING_NONE,
         EFFECT_STRING_RAINBOW,
-        EFFECT_STRING_RAINBOW_CYCLE,
+        EFFECT_STRING_COLORLOOP,
         EFFECT_STRING_LASERSCANNER
     };
 
@@ -62,8 +62,8 @@ Effect effectFromStringRepresentation(const char* effectStringRepresentation) {
 
     if (strcmp(effectStringRepresentation, EFFECT_STRING_RAINBOW) == 0) {
         effect = RAINBOW;
-    } else if (strcmp(effectStringRepresentation, EFFECT_STRING_RAINBOW_CYCLE) == 0) {
-        effect = RAINBOW_CYCLE;
+    } else if (strcmp(effectStringRepresentation, EFFECT_STRING_COLORLOOP) == 0) {
+        effect = COLORLOOP;
     } else if (strcmp(effectStringRepresentation, EFFECT_STRING_LASERSCANNER) == 0) {
         effect = LASERSCANNER;
     } else {

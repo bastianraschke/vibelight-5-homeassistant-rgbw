@@ -15,7 +15,6 @@ uint8_t constrainBetweenByte(const int valueToConstrain) {
 
 class LEDStrip {
     public:
-        Effect supportedEffects[0] = {};
 
         void setup(const uint8_t redOffset, const uint8_t greenOffset, const uint8_t blueOffset, const uint8_t whiteOffset, const bool isWhiteSupported) {
             this->colorCorrectionOffset = Color {
@@ -58,6 +57,8 @@ class LEDStrip {
         void setEffect(const Effect effect) {
             if (isEffectSupported(effect)) {
                 this->effect = effect;
+            } else {
+                this->effect = NONE;
             }
         }
 
@@ -155,39 +156,36 @@ class LEDStrip {
         uint32_t animationStepDelay = 10000;
 
         Color calculateCurrentWheelColor(uint8_t wheelPosition) {
-            Color currentWheelColor;
+            Color originalWheelColor;
             wheelPosition = 255 - wheelPosition;
 
             if (wheelPosition < 85) {
-                currentWheelColor = Color {255 - wheelPosition * 3, 0, wheelPosition * 3, 0};
+                originalWheelColor = Color {255 - wheelPosition * 3, 0, wheelPosition * 3, 0};
             } else if (wheelPosition < 170) {
                 wheelPosition -= 85;
-                currentWheelColor = Color {0, wheelPosition * 3, 255 - wheelPosition * 3, 0};
+                originalWheelColor = Color {0, wheelPosition * 3, 255 - wheelPosition * 3, 0};
             } else {
                 wheelPosition -= 170;
-                currentWheelColor = Color {wheelPosition * 3, 255 - wheelPosition * 3, 0, 0};
+                originalWheelColor = Color {wheelPosition * 3, 255 - wheelPosition * 3, 0, 0};
             }
 
-            return currentWheelColor;
+            const uint8_t offsettedRedWheelColor = constrainBetweenByte(originalWheelColor.red + colorCorrectionOffset.red);
+            const uint8_t offsettedGreenWheelColor = constrainBetweenByte(originalWheelColor.green + colorCorrectionOffset.green);
+            const uint8_t offsettedBlueWheelColor = constrainBetweenByte(originalWheelColor.blue + colorCorrectionOffset.blue);
+            const uint8_t offsettedWhiteWheelColor = constrainBetweenByte(originalWheelColor.white + colorCorrectionOffset.white);
+
+            return Color {
+                calculateColorValueWithBrightness(offsettedRedWheelColor),
+                calculateColorValueWithBrightness(offsettedGreenWheelColor),
+                calculateColorValueWithBrightness(offsettedBlueWheelColor),
+                calculateColorValueWithBrightness(offsettedWhiteWheelColor)
+            };
         }
 
     private:
 
         virtual void setupInternal() = 0;
-
-        bool isEffectSupported(const Effect effect) {
-            bool isEffectSupported = false;
-
-            // TODO: Check if it works
-            for (int i = 0; i < sizeof(supportedEffects) / sizeof(Effect); i++) {
-                if (supportedEffects[i] == effect) {
-                    isEffectSupported = true;
-                    break;
-                }
-            }
-
-            return isEffectSupported;
-        }
+        virtual bool isEffectSupported(const Effect effect) = 0;
 
         void updateColorRelatedValues() {
             if (state) {
@@ -227,8 +225,8 @@ class LEDStrip {
                     animationStepDelay = 25000;
                     infinityAnimation = true;
                     break;
-                case RAINBOW_CYCLE:
-                    animationStepDelay = 12000;
+                case COLORLOOP:
+                    animationStepDelay = 25000;
                     infinityAnimation = true;
                     break;
                 case LASERSCANNER:
@@ -259,8 +257,8 @@ class LEDStrip {
                 case RAINBOW:
                     updateRainbowAnimation();
                     break;
-                case RAINBOW_CYCLE:
-                    updateRainbowCycleAnimation();
+                case COLORLOOP:
+                    updateColorloopAnimation();
                     break;
                 case LASERSCANNER:
                     updateLaserscannerAnimation();
@@ -272,7 +270,7 @@ class LEDStrip {
         }
 
         virtual void updateRainbowAnimation() = 0;
-        virtual void updateRainbowCycleAnimation() = 0;
+        virtual void updateColorloopAnimation() = 0;
         virtual void updateLaserscannerAnimation() = 0;
 
         void updateTransitionColor() {
@@ -282,16 +280,6 @@ class LEDStrip {
                 calculateTransitionStateColor(animationStepIndex, transitionBeginColor.blue, transitionFinishColor.blue),
                 calculateTransitionStateColor(animationStepIndex, transitionBeginColor.white, transitionFinishColor.white)
             };
-
-            // Serial.print("updateColor transitionStateColor = ");
-            // Serial.print(" r = ");
-            // Serial.print(transitionStateColor.red);
-            // Serial.print(" g = ");
-            // Serial.print(transitionStateColor.green);
-            // Serial.print(" b = ");
-            // Serial.print(transitionStateColor.blue);
-            // Serial.print(" w = ");
-            // Serial.print(transitionStateColor.white);
 
             showTransitionColor(transitionStateColor);
 
@@ -320,54 +308,64 @@ class LEDStrip {
 class WS2812BStrip : public LEDStrip {
 
     public:
-        Effect supportedEffects[3] = {RAINBOW, RAINBOW_CYCLE, LASERSCANNER};
 
         WS2812BStrip(const uint8_t neopixelPin, const uint8_t neopixelCount) {
             neopixelStrip = Adafruit_NeoPixel(neopixelCount, neopixelPin, NEO_GRB + NEO_KHZ800);
         }
 
     private:
+
         Adafruit_NeoPixel neopixelStrip;
 
         virtual void setupInternal() {
             neopixelStrip.begin();
         }
 
-        virtual void updateRainbowAnimation() {
-            /*
-            for (int i = 0; i < neopixelStrip.numPixels(); i++) {
-                const Color currentWheelColor = calculateCurrentWheelColor((i + animationStepIndex) & 255)
-                neopixelStrip.setPixelColor(i, currentWheelColor.red, currentWheelColor.green, currentWheelColor.blue, currentWheelColor.white);
+        virtual bool isEffectSupported(const Effect effect) {
+            bool isEffectSupported = false;
+            const Effect supportedEffects[] = {RAINBOW, COLORLOOP, LASERSCANNER};
+
+            for (int i = 0; i < sizeof(supportedEffects) / sizeof(Effect); i++) {
+                if (supportedEffects[i] == effect) {
+                    isEffectSupported = true;
+                    break;
+                }
             }
 
-            neopixelStrip.show();
-            */
+            return isEffectSupported;
         }
 
-        virtual void updateRainbowCycleAnimation() {
-            /*
+        virtual void updateRainbowAnimation() {
             for (int i = 0; i < neopixelStrip.numPixels(); i++) {
-                const Color currentWheelColor = calculateCurrentWheelColor(((i * 256 / neopixelStrip.numPixels()) + animationStepIndex) & 255)
+                const Color currentWheelColor = calculateCurrentWheelColor(((i * 256 / neopixelStrip.numPixels()) + animationStepIndex) & 255);
                 neopixelStrip.setPixelColor(i, currentWheelColor.red, currentWheelColor.green, currentWheelColor.blue, currentWheelColor.white);
             }
 
             neopixelStrip.show();
-            */
+        }
+
+        virtual void updateColorloopAnimation() {
+            for (int i = 0; i < neopixelStrip.numPixels(); i++) {
+                const Color currentWheelColor = calculateCurrentWheelColor((i + animationStepIndex) & 255);
+                neopixelStrip.setPixelColor(i, currentWheelColor.red, currentWheelColor.green, currentWheelColor.blue, currentWheelColor.white);
+            }
+
+            neopixelStrip.show();
         }
 
         virtual void updateLaserscannerAnimation() {
-            /*
-            const Color primaryColor = offsettedColor;
+            const Color primaryColor = transitionFinishColor;
 
-            const uint8_t scannerPrimaryWidth = 2;
+            const uint32_t neopixelCount = neopixelStrip.numPixels();
 
+            const uint8_t scannerPrimaryWidth = 1;
             const uint16_t minIndex = 0;
             const uint16_t maxIndex = neopixelCount - 1;
 
             int lLimit;
             int rLimit;
 
-            if (direction == LEFT) {
+            if (effectDirection == LEFT) {
                 lLimit = minIndex + scannerPrimaryWidth;
                 rLimit = maxIndex - scannerPrimaryWidth;
             } else {
@@ -375,33 +373,32 @@ class WS2812BStrip : public LEDStrip {
                 rLimit = minIndex + scannerPrimaryWidth;
             }
 
-            const uint16_t currentLimitedIndex = round(map(currentIndex, 0, 255, lLimit, rLimit));
+            const uint16_t currentLimitedIndex = round(map(animationStepIndex, 0, 255, lLimit, rLimit));
 
             // Use the half of primary color as secondary color
-            const Color secondaryColor = (
+            const Color secondaryColor = Color {
                 primaryColor.red / 2,
                 primaryColor.green / 2,
                 primaryColor.blue / 2,
                 primaryColor.white / 2
-            );
+            };
 
             for (int i = 0; i < neopixelCount; i++) {
                 const int l = currentLimitedIndex - scannerPrimaryWidth;
                 const int r = currentLimitedIndex + scannerPrimaryWidth;
 
                 if (i == l) {
-                    neopixelStrip.setPixelColor(i, secondaryColor); 
+                    neopixelStrip.setPixelColor(i, colorToInteger(secondaryColor)); 
                 } else if (i > l && i < r) {
-                    neopixelStrip.setPixelColor(i, primaryColor); 
+                    neopixelStrip.setPixelColor(i, colorToInteger(primaryColor)); 
                 } else if (i == r) {
-                    neopixelStrip.setPixelColor(i, secondaryColor); 
+                    neopixelStrip.setPixelColor(i, colorToInteger(secondaryColor)); 
                 } else {
                     neopixelStrip.setPixelColor(i, 0x000000);
                 }
             }
 
             neopixelStrip.show();
-            */
         }
 
         virtual void showTransitionColor(const Color transitionStateColor) {
@@ -414,7 +411,6 @@ class WS2812BStrip : public LEDStrip {
 class CathodeStrip : public LEDStrip {
 
     public:
-        Effect supportedEffects[1] = {RAINBOW_CYCLE};
 
         CathodeStrip(const int8_t pinRed, const int8_t pinGreen, const int8_t pinBlue, const int8_t pinWhite) {
             this->pinRed = pinRed;
@@ -424,6 +420,7 @@ class CathodeStrip : public LEDStrip {
         }
 
     private:
+
         int8_t pinRed = -1;
         int8_t pinGreen = -1;
         int8_t pinBlue = -1;
@@ -449,12 +446,16 @@ class CathodeStrip : public LEDStrip {
             }
         }
 
-        virtual void updateRainbowAnimation() {
-            // Not supported
+        virtual bool isEffectSupported(const Effect effect) {
+            return false;
         }
 
-        virtual void updateRainbowCycleAnimation() {
+        virtual void updateRainbowAnimation() {
             // TODO: Implement
+        }
+
+        virtual void updateColorloopAnimation() {
+            // Not supported
         }
 
         virtual void updateLaserscannerAnimation() {
