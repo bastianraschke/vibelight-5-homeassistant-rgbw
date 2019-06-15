@@ -154,28 +154,6 @@ class LEDStrip {
         uint8_t animationStepIndex = 0;
         uint32_t animationStepDelay = 10000;
 
-        Color calculateTransitionStateColor(const uint8_t animationIndex, const Color startColor, const Color endColor) {
-            return Color {
-                calculateTransitionStateColorValue(animationStepIndex, startColor.red, endColor.red),
-                calculateTransitionStateColorValue(animationStepIndex, startColor.green, endColor.green),
-                calculateTransitionStateColorValue(animationStepIndex, startColor.blue, endColor.blue),
-                calculateTransitionStateColorValue(animationStepIndex, startColor.white, endColor.white)
-            };
-        }
-
-        uint8_t calculateTransitionStateColorValue(const uint8_t animationIndex, const uint8_t startValue, const uint8_t endValue) {
-            uint8_t animationStateValue;
-
-            // Prevent division-by-zero
-            if (startValue == endValue) {
-                animationStateValue = startValue;
-            } else {
-                animationStateValue = map(animationIndex, 0, 255, startValue, endValue);
-            }
-
-            return animationStateValue;
-        }
-
         Color calculateCurrentWheelColor(uint8_t wheelPosition) {
             Color currentWheelColor;
             wheelPosition = 255 - wheelPosition;
@@ -288,7 +266,7 @@ class LEDStrip {
                     updateLaserscannerAnimation();
                     break;
                 case NONE:
-                    updateColor();
+                    updateTransitionColor();
                     break;
             }
         }
@@ -296,7 +274,47 @@ class LEDStrip {
         virtual void updateRainbowAnimation() = 0;
         virtual void updateRainbowCycleAnimation() = 0;
         virtual void updateLaserscannerAnimation() = 0;
-        virtual void updateColor() = 0;
+
+        void updateTransitionColor() {
+            const Color transitionStateColor = Color {
+                calculateTransitionStateColor(animationStepIndex, transitionBeginColor.red, transitionFinishColor.red),
+                calculateTransitionStateColor(animationStepIndex, transitionBeginColor.green, transitionFinishColor.green),
+                calculateTransitionStateColor(animationStepIndex, transitionBeginColor.blue, transitionFinishColor.blue),
+                calculateTransitionStateColor(animationStepIndex, transitionBeginColor.white, transitionFinishColor.white)
+            };
+
+            // Serial.print("updateColor transitionStateColor = ");
+            // Serial.print(" r = ");
+            // Serial.print(transitionStateColor.red);
+            // Serial.print(" g = ");
+            // Serial.print(transitionStateColor.green);
+            // Serial.print(" b = ");
+            // Serial.print(transitionStateColor.blue);
+            // Serial.print(" w = ");
+            // Serial.print(transitionStateColor.white);
+
+            showTransitionColor(transitionStateColor);
+
+            // On last step update transition start color for next transition
+            if (animationStepIndex == ANIMATION_STEP_COUNT - 1) {
+                transitionBeginColor = transitionStateColor;
+            }
+        }
+
+        uint8_t calculateTransitionStateColor(const uint8_t animationIndex, const uint8_t startValue, const uint8_t endValue) {
+            uint8_t animationStateValue;
+
+            // Prevent division-by-zero
+            if (startValue == endValue) {
+                animationStateValue = startValue;
+            } else {
+                animationStateValue = map(animationIndex, 0, 255, startValue, endValue);
+            }
+
+            return animationStateValue;
+        }
+
+        virtual void showTransitionColor(const Color transitionStateColor) = 0;
 };
 
 class WS2812BStrip : public LEDStrip {
@@ -386,27 +404,10 @@ class WS2812BStrip : public LEDStrip {
             */
         }
 
-        virtual void updateColor() {
-            const Color transitionStateColor = calculateTransitionStateColor(animationStepIndex, transitionBeginColor, transitionFinishColor);
-
-            // Serial.print("updateColor transitionStateColor = ");
-            // Serial.print(" r = ");
-            // Serial.print(transitionStateColor.red);
-            // Serial.print(" g = ");
-            // Serial.print(transitionStateColor.green);
-            // Serial.print(" b = ");
-            // Serial.print(transitionStateColor.blue);
-            // Serial.print(" w = ");
-            // Serial.print(transitionStateColor.white);
-
-            const uint32_t transitionStateColorInteger = neopixelStrip.Color(transitionStateColor.red, transitionStateColor.green, transitionStateColor.blue, transitionStateColor.white);
-            neopixelStrip.fill(transitionStateColorInteger, 0, neopixelStrip.numPixels());
+        virtual void showTransitionColor(const Color transitionStateColor) {
+            const uint32_t colorInteger = neopixelStrip.Color(transitionStateColor.red, transitionStateColor.green, transitionStateColor.blue, transitionStateColor.white);
+            neopixelStrip.fill(colorInteger, 0, neopixelStrip.numPixels());
             neopixelStrip.show();
-
-            // On last step update transition start color for next transition
-            if (animationStepIndex == ANIMATION_STEP_COUNT - 1) {
-                transitionBeginColor = transitionStateColor;
-            }
         }
 };
 
@@ -448,9 +449,19 @@ class CathodeStrip : public LEDStrip {
             }
         }
 
-        virtual void updateColor() {
-            const Color transitionStateColor = calculateTransitionStateColor(animationStepIndex, transitionBeginColor, transitionFinishColor);
+        virtual void updateRainbowAnimation() {
+            // Not supported
+        }
 
+        virtual void updateRainbowCycleAnimation() {
+            // TODO: Implement
+        }
+
+        virtual void updateLaserscannerAnimation() {
+            // Not supported
+        }
+
+        virtual void showTransitionColor(const Color transitionStateColor) {
             if (pinRed >= 0) {
                 analogWrite(pinRed, transitionStateColor.red);
             }
@@ -466,23 +477,6 @@ class CathodeStrip : public LEDStrip {
             if (pinWhite >= 0 && isWhiteSupported) {
                 analogWrite(pinWhite, transitionStateColor.white);
             }
-
-            // On last step update transition start color for next transition
-            if (animationStepIndex == ANIMATION_STEP_COUNT - 1) {
-                transitionBeginColor = transitionStateColor;
-            }
-        }
-
-        virtual void updateRainbowAnimation() {
-            // Not supported
-        }
-
-        virtual void updateRainbowCycleAnimation() {
-            // TODO: Implement
-        }
-
-        virtual void updateLaserscannerAnimation() {
-            // Not supported
         }
 };
 
