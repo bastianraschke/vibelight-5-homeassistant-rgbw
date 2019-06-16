@@ -21,6 +21,19 @@ Here you see the firmware used on a Wemos D1 Mini based RGBW controller to nicel
 
 The firmware must be configured before flashing to ESP8266. Rename `src/Firmware/sketches/Production/config-sample.h` to `src/Firmware/sketches/Production/config.h` and change the values like desired.
 
+### Flash settings
+
+* **Arduino IDE:** 1.8.5
+* **Platform:** esp8266 2.4.2
+* **Board:** LOLIN (WEMOS) D1 R2 & mini
+* **Flash Size**: 4M (1M SPIFFS)
+* **Debug Port**: Disabled
+* **Debug Level**: None
+* **IwIP Variant**: v2 Lower Memory
+* **VTables**: Flash
+* **CPU Frequency**: 80 MHz
+* **Erase Flash**: Only Sketch
+
 ## Example configuration for Home Assistant
 
 The example blocks must be added to the `light` block of your configuration.
