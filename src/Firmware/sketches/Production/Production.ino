@@ -203,6 +203,8 @@ class LEDStrip {
                     calculateColorValueWithBrightness(offsettedWhiteColor)
                 };
             } else {
+                // Cancel effect if any is running and set transition finish color to black
+                effect = NONE;
                 transitionFinishColor = Color {0, 0, 0, 0};
             }
         }
