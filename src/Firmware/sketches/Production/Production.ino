@@ -392,11 +392,11 @@ class WS2812BStrip : public LEDStrip {
                 const int r = currentLimitedIndex + scannerPrimaryWidth;
 
                 if (i == l) {
-                    neopixelStrip.setPixelColor(i, colorToInteger(secondaryColor)); 
+                    neopixelStrip.setPixelColor(i, colorToInteger(secondaryColor));
                 } else if (i > l && i < r) {
-                    neopixelStrip.setPixelColor(i, colorToInteger(primaryColor)); 
+                    neopixelStrip.setPixelColor(i, colorToInteger(primaryColor));
                 } else if (i == r) {
-                    neopixelStrip.setPixelColor(i, colorToInteger(secondaryColor)); 
+                    neopixelStrip.setPixelColor(i, colorToInteger(secondaryColor));
                 } else {
                     neopixelStrip.setPixelColor(i, 0x000000);
                 }
@@ -539,8 +539,7 @@ void setupWifi() {
 
 void blinkStatusLED(const int times) {
     #ifdef PIN_STATUSLED
-        for (int i = 0; i < times; i++)
-        {
+        for (int i = 0; i < times; i++) {
             // Enable LED
             digitalWrite(PIN_STATUSLED, LOW);
             delay(100);
@@ -563,7 +562,7 @@ void setupLEDs() {
             ledStrip = new WS2812BStrip(PIN_LED_SIGNAL, LED_COUNT);
             break;
         default:
-            ledStrip = nullptr; 
+            ledStrip = nullptr;
             break;
     }
 
