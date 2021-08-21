@@ -17,12 +17,11 @@ class LEDStrip {
     public:
 
         void setup(const uint8_t redOffset, const uint8_t greenOffset, const uint8_t blueOffset, const uint8_t whiteOffset, const bool isWhiteSupported) {
-            // TODO: Given `uint8_t` parameters should not need `constrainBetweenByte`?
             this->colorCorrectionOffset = Color {
-                constrainBetweenByte(redOffset),
-                constrainBetweenByte(greenOffset),
-                constrainBetweenByte(blueOffset),
-                isWhiteSupported ? constrainBetweenByte(whiteOffset) : 0
+                redOffset,
+                greenOffset,
+                blueOffset,
+                isWhiteSupported ? whiteOffset : 0
             };
 
             this->isWhiteSupported = isWhiteSupported;
@@ -36,12 +35,11 @@ class LEDStrip {
         }
 
         void setColor(const Color color) {
-            // TODO: Given `uint8_t` parameters should not need `constrainBetweenByte`?
             this->color = Color {
-                constrainBetweenByte(color.red),
-                constrainBetweenByte(color.green),
-                constrainBetweenByte(color.blue),
-                isWhiteSupported ? constrainBetweenByte(color.white) : 0
+                color.red,
+                color.green,
+                color.blue,
+                isWhiteSupported ? color.white : 0
             };
 
             updateColorRelatedValues();
@@ -356,7 +354,6 @@ class WS2812BStrip : public LEDStrip {
             neopixelStrip.show();
         }
 
-        // TODO: Refactor?
         virtual void updateLaserscannerAnimation() {
             const Color primaryColor = transitionFinishColor;
 
@@ -455,7 +452,7 @@ class CathodeStrip : public LEDStrip {
         }
 
         virtual void updateRainbowAnimation() {
-            // TODO: Implement
+            // Not supported
         }
 
         virtual void updateColorloopAnimation() {
