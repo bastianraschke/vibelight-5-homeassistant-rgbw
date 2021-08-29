@@ -448,7 +448,17 @@ class CathodeStrip : public LEDStrip {
         }
 
         virtual bool isEffectSupported(const Effect effect) {
-            return false;
+            bool isEffectSupported = false;
+            const Effect supportedEffects[] = {COLORLOOP};
+
+            for (int i = 0; i < sizeof(supportedEffects) / sizeof(Effect); i++) {
+                if (supportedEffects[i] == effect) {
+                    isEffectSupported = true;
+                    break;
+                }
+            }
+
+            return isEffectSupported;
         }
 
         virtual void updateRainbowAnimation() {
@@ -456,7 +466,8 @@ class CathodeStrip : public LEDStrip {
         }
 
         virtual void updateColorloopAnimation() {
-            // Not supported
+            const Color currentWheelColor = calculateCurrentWheelColor(animationStepIndex);
+            showColorInternal(currentWheelColor);
         }
 
         virtual void updateLaserscannerAnimation() {
@@ -464,20 +475,24 @@ class CathodeStrip : public LEDStrip {
         }
 
         virtual void showTransitionColor(const Color transitionStateColor) {
+            showColorInternal(transitionStateColor);
+        }
+
+        void showColorInternal(const Color color) {
             if (pinRed >= 0) {
-                analogWrite(pinRed, transitionStateColor.red);
+                analogWrite(pinRed, color.red);
             }
 
             if (pinGreen >= 0) {
-                analogWrite(pinGreen, transitionStateColor.green);
+                analogWrite(pinGreen, color.green);
             }
 
             if (pinBlue >= 0) {
-                analogWrite(pinBlue, transitionStateColor.blue);
+                analogWrite(pinBlue, color.blue);
             }
 
             if (pinWhite >= 0 && isWhiteSupported) {
-                analogWrite(pinWhite, transitionStateColor.white);
+                analogWrite(pinWhite, color.white);
             }
         }
 };
