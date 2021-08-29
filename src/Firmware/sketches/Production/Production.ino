@@ -346,11 +346,9 @@ class WS2812BStrip : public LEDStrip {
         }
 
         virtual void updateColorloopAnimation() {
-            for (int i = 0; i < neopixelStrip.numPixels(); i++) {
-                const Color currentWheelColor = calculateCurrentWheelColor((i + animationStepIndex) & 255);
-                neopixelStrip.setPixelColor(i, currentWheelColor.red, currentWheelColor.green, currentWheelColor.blue, currentWheelColor.white);
-            }
-
+            const Color currentWheelColor = calculateCurrentWheelColor(animationStepIndex);
+            const uint32_t colorInteger = colorToInteger(currentWheelColor);
+            neopixelStrip.fill(colorInteger, 0, neopixelStrip.numPixels());
             neopixelStrip.show();
         }
 
