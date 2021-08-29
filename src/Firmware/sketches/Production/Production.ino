@@ -677,16 +677,19 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
             ledStrip->setState(state);
         }
 
-        // TODO: Check of "r", "b", "g" keys there?
         if (root.containsKey("color")) {
-            const Color color = {
-                constrainBetweenByte(root["color"]["r"]),
-                constrainBetweenByte(root["color"]["g"]),
-                constrainBetweenByte(root["color"]["b"]),
-                (root.containsKey("white_value")) ? constrainBetweenByte(root["white_value"]) : 0
-            };
+            JsonObject& jsonColor = root["color"];
 
-            ledStrip->setColor(color);
+            if (jsonColor.containsKey("r") && jsonColor.containsKey("g") && jsonColor.containsKey("b")) {
+                const Color color = {
+                    constrainBetweenByte(jsonColor["r"]),
+                    constrainBetweenByte(jsonColor["g"]),
+                    constrainBetweenByte(jsonColor["b"]),
+                    (root.containsKey("white_value")) ? constrainBetweenByte(root["white_value"]) : 0
+                };
+
+                ledStrip->setColor(color);
+            }
         }
 
         if (root.containsKey("brightness")) {
