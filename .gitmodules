@@ -6,3 +6,7 @@
 	path = src/Firmware/libraries/ArduinoJson
 	url = https://github.com/bastianraschke/ArduinoJson.git
 	branch = master
+[submodule "src/Firmware/libraries/Adafruit_NeoPixel"]
+	path = src/Firmware/libraries/Adafruit_NeoPixel
+	url = https://github.com/bastianraschke/Adafruit_NeoPixel.git
+	branch = master
