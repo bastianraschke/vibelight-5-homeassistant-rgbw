@@ -627,13 +627,13 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length) 
 }
 
 /*
-    Example payload (RGB+W):
+    Example payload with all fields:
     {
       "state": "ON",
       "color": {
-        "b": 0,
-        "g": 0,
         "r": 255
+        "g": 0,
+        "b": 0,
       },
       "white_value": 255
       "brightness": 120,
@@ -641,18 +641,33 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length) 
       "effect": "rainbow"
     }
 
-    Example payload (RGB):
+    Example payload with only color and white value fields:
     {
       "state": "ON",
       "color": {
-        "b": 0,
-        "g": 0,
-        "r": 255
+        "r": 255,
+        "g": 255,
+        "b": 255
       },
-      "brightness": 120,
-      "transition": 5,
-      "effect": "rainbow"
+      "white_value": 128
     }
+
+    Example payload with only color fields:
+    {
+      "state": "ON",
+      "color": {
+        "r": 255,
+        "g": 0,
+        "b": 0
+      }
+    }
+
+    Example payload with only white value field:
+    {
+      "state": "ON",
+      "white_value": 128
+    }
+
 */
 bool updateValuesAccordingJsonMessage(char* jsonPayload) {
     bool wasSuccessfulParsed = true;
@@ -679,16 +694,30 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
             JsonObject& jsonColor = root["color"];
 
             if (jsonColor.containsKey("r") && jsonColor.containsKey("g") && jsonColor.containsKey("b")) {
-                const Color color = {
+                const Color currentColor = ledStrip->getColor();
+                const Color newColor = {
                     constrainBetweenByte(jsonColor["r"]),
                     constrainBetweenByte(jsonColor["g"]),
                     constrainBetweenByte(jsonColor["b"]),
-                    (root.containsKey("white_value")) ? constrainBetweenByte(root["white_value"]) : 0
+                    currentColor.white,
                 };
 
-                ledStrip->setColor(color);
+                ledStrip->setColor(newColor);
             }
         }
+
+        if (root.containsKey("white_value")) {
+            const Color currentColor = ledStrip->getColor();
+            const Color newColor = {
+                currentColor.red,
+                currentColor.green,
+                currentColor.blue,
+                constrainBetweenByte(root["white_value"])
+            };
+
+            ledStrip->setColor(newColor);
+        }
+
 
         if (root.containsKey("brightness")) {
             const uint8_t brightness = constrainBetweenByte(root["brightness"]);
