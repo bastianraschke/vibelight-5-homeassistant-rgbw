@@ -1,12 +1,12 @@
 [submodule "src/Firmware/libraries/PubSubClient"]
 	path = src/Firmware/libraries/PubSubClient
-	url = https://github.com/bastianraschke/pubsubclient.git
+	url = ../pubsubclient.git
 	branch = master
 [submodule "src/Firmware/libraries/ArduinoJson"]
 	path = src/Firmware/libraries/ArduinoJson
-	url = https://github.com/bastianraschke/ArduinoJson.git
+	url = ../ArduinoJson.git
 	branch = master
 [submodule "src/Firmware/libraries/Adafruit_NeoPixel"]
 	path = src/Firmware/libraries/Adafruit_NeoPixel
-	url = https://github.com/bastianraschke/Adafruit_NeoPixel.git
+	url = ../Adafruit_NeoPixel.git
 	branch = master
