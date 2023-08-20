@@ -5,8 +5,6 @@
 
 #include "config.h"
 
-#define FIRMWARE_VERSION  "5.2.0"
-
 uint8_t constrainBetweenByte(const int valueToConstrain) {
     return constrain(valueToConstrain, 0, 255);
 }
