@@ -582,7 +582,7 @@ void setupLEDs() {
     const uint8_t initialBrightness = 255;
     const int initialTransitionDuration = LED_TRANSITION_DURATION;
 
-    // If native white LEDs are supported, show just them initially
+    // If native white LEDs are supported, just show them initially
     if (isWhiteSupported) {
         initialColor = {0, 0, 0, 255};
     } else {
@@ -625,45 +625,51 @@ void onMessageReceivedCallback(char* topic, byte* payload, unsigned int length) 
 }
 
 /*
-    Example payload with all fields:
+    Example payload with all values set:
     {
       "state": "ON",
       "color": {
-        "r": 255
+        "r": 255,
         "g": 0,
         "b": 0,
+        "w": 255
       },
-      "white_value": 255
       "brightness": 120,
       "transition": 5,
       "effect": "rainbow"
     }
 
-    Example payload with only color and white value fields:
+    Example payload with color and white values set:
     {
       "state": "ON",
       "color": {
         "r": 255,
         "g": 255,
-        "b": 255
-      },
-      "white_value": 128
+        "b": 255,
+        "w": 255
+      }
     }
 
-    Example payload with only color fields:
+    Example payload with color values set:
     {
       "state": "ON",
       "color": {
         "r": 255,
-        "g": 0,
-        "b": 0
+        "g": 255,
+        "b": 255,
+        "w": 0
       }
     }
 
-    Example payload with only white value field:
+    Example payload with white value set:
     {
       "state": "ON",
-      "white_value": 128
+      "color": {
+        "r": 0,
+        "g": 0,
+        "b": 0,
+        "w": 255
+      }
     }
 
 */
@@ -702,20 +708,20 @@ bool updateValuesAccordingJsonMessage(char* jsonPayload) {
 
                 ledStrip->setColor(newColor);
             }
+
+
+            if (jsonColor.containsKey("w")) {
+                const Color currentColor = ledStrip->getColor();
+                const Color newColor = {
+                    currentColor.red,
+                    currentColor.green,
+                    currentColor.blue,
+                    constrainBetweenByte(jsonColor["w"])
+                };
+
+                ledStrip->setColor(newColor);
+            }
         }
-
-        if (root.containsKey("white_value")) {
-            const Color currentColor = ledStrip->getColor();
-            const Color newColor = {
-                currentColor.red,
-                currentColor.green,
-                currentColor.blue,
-                constrainBetweenByte(root["white_value"])
-            };
-
-            ledStrip->setColor(newColor);
-        }
-
 
         if (root.containsKey("brightness")) {
             const uint8_t brightness = constrainBetweenByte(root["brightness"]);
@@ -782,7 +788,7 @@ void publishState() {
     jsonColor["b"] = color.blue;
 
     if (ledStrip->getIsWhiteSupported()) {
-        root["white_value"] = color.white;
+        jsonColor["w"] = color.white;
     }
 
     uint8_t brightness;

@@ -25,8 +25,8 @@
 #define MQTT_USERNAME                  VIBELIGHT_NODE_ID
 #define MQTT_PASSWORD                  ""
 
-#define MQTT_CHANNEL_STATE             "/vibelight/api/5/id/AAAABBBB/state/"
-#define MQTT_CHANNEL_COMMAND           "/vibelight/api/5/id/AAAABBBB/command/"
+#define MQTT_CHANNEL_STATE             "/vibelight/api/6/id/AAAABBBB/state/"
+#define MQTT_CHANNEL_COMMAND           "/vibelight/api/6/id/AAAABBBB/command/"
 
 // Uncomment if on the board is an onboard LED
 #define PIN_STATUSLED                  LED_BUILTIN

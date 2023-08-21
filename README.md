@@ -25,98 +25,96 @@ The firmware must be configured before flashing to ESP8266. Rename `src/Firmware
 
 #### NodeMCU
 
-* **Arduino IDE:** 1.8.15
+* **Arduino IDE:** 2.1.1
 * **Platform:** esp8266 2.4.2
 * **Board:** NodeMCU 1.0 (ESP-12E Module)
-* **Flash Size**: 4M (1M SPIFFS)
+* **CPU Frequency**: 80 MHz
 * **Debug Port**: Disabled
 * **Debug Level**: None
+* **Erase Flash**: Only Sketch
+* **Flash Size**: 4M (1M SPIFFS)
 * **IwIP Variant**: v2 Lower Memory
 * **VTables**: Flash
-* **CPU Frequency**: 80 MHz
-* **Erase Flash**: Only Sketch
 
 #### LOLIN (Wemos) D1 mini
 
-* **Arduino IDE:** 1.8.15
+* **Arduino IDE:** 2.1.1
 * **Platform:** esp8266 2.4.2
 * **Board:** LOLIN (WEMOS) D1 R2 & mini
-* **Flash Size**: 4M (1M SPIFFS)
+* **CPU Frequency**: 80 MHz
 * **Debug Port**: Disabled
 * **Debug Level**: None
+* **Erase Flash**: Only Sketch
+* **Flash Size**: 4M (1M SPIFFS)
 * **IwIP Variant**: v2 Lower Memory
 * **VTables**: Flash
-* **CPU Frequency**: 80 MHz
-* **Erase Flash**: Only Sketch
 
 ## Example configuration for Home Assistant
 
-The example blocks must be added to the `light` block of your configuration.
+Tested with Home Assistant 2023.8.2.
+
+The example blocks must be added to the `mqtt` block of your configuration.
 
 ### RGB (classic cathode LEDs)
 
-    - platform: mqtt_json
-      name: "My VibeLight RGB light"
-      state_topic: "/vibelight/api/5/id/AAAABBBB/state/"
-      command_topic: "/vibelight/api/5/id/AAAABBBB/command/"
-      brightness: true
-      rgb: true
-      white_value: false
-      effect: true
-      effect_list:
-        - none
-        - colorloop
-      optimistic: false
-      qos: 0
+    - light:
+        name: "My VibeLight RGB light"
+        schema: json
+        state_topic: "/vibelight/api/6/id/AAAABBBB/state/"
+        command_topic: "/vibelight/api/6/id/AAAABBBB/command/"
+        brightness: true
+        color_mode: true
+        supported_color_modes: ["rgb"]
+        effect: true
+        effect_list:
+          - none
+          - colorloop
 
 ### RGBW (classic cathode LEDs)
 
-    - platform: mqtt_json
-      name: "My VibeLight RGBW light"
-      state_topic: "/vibelight/api/5/id/AAAABBBB/state/"
-      command_topic: "/vibelight/api/5/id/AAAABBBB/command/"
-      brightness: true
-      rgb: true
-      white_value: true
-      effect: true
-      effect_list:
-        - none
-        - colorloop
-      optimistic: false
-      qos: 0
+    - light:
+        name: "My VibeLight RGB light"
+        schema: json
+        state_topic: "/vibelight/api/6/id/AAAABBBB/state/"
+        command_topic: "/vibelight/api/6/id/AAAABBBB/command/"
+        brightness: true
+        color_mode: true
+        supported_color_modes: ["rgbw"]
+        effect: true
+        effect_list:
+          - none
+          - colorloop
 
 ### RGB (WS2812B LEDs)
 
-    - platform: mqtt_json
-      name: "My VibeLight RGB light"
-      state_topic: "/vibelight/api/5/id/AAAABBBB/state/"
-      command_topic: "/vibelight/api/5/id/AAAABBBB/command/"
-      brightness: true
-      rgb: true
-      white_value: false
-      effect: true
-      effect_list:
-        - none
-        - rainbow
-        - colorloop
-        - laserscanner
-      optimistic: false
-      qos: 0
+    - light:
+        name: "My VibeLight RGB light"
+        schema: json
+        state_topic: "/vibelight/api/6/id/AAAABBBB/state/"
+        command_topic: "/vibelight/api/6/id/AAAABBBB/command/"
+        brightness: true
+        color_mode: true
+        supported_color_modes: ["rgb"]
+        effect: true
+        effect_list:
+          - none
+          - rainbow
+          - colorloop
+          - laserscanner
 
 ### RGBW (WS2812B LEDs)
 
-    - platform: mqtt_json
-      name: "My VibeLight RGBW light"
-      state_topic: "/vibelight/api/5/id/AAAABBBB/state/"
-      command_topic: "/vibelight/api/5/id/AAAABBBB/command/"
-      brightness: true
-      rgb: true
-      white_value: true
-      effect: true
-      effect_list:
-        - none
-        - rainbow
-        - colorloop
-        - laserscanner
-      optimistic: false
-      qos: 0
+    - light:
+        name: "My VibeLight RGB light"
+        schema: json
+        state_topic: "/vibelight/api/6/id/AAAABBBB/state/"
+        command_topic: "/vibelight/api/6/id/AAAABBBB/command/"
+        brightness: true
+        color_mode: true
+        supported_color_modes: ["rgbw"]
+        effect: true
+        effect_list:
+          - none
+          - rainbow
+          - colorloop
+          - laserscanner
