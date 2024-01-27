@@ -25,7 +25,7 @@ The firmware must be configured before flashing to ESP8266. Rename `src/Firmware
 
 #### NodeMCU
 
-* **Arduino IDE:** 2.1.1
+* **Arduino IDE:** 2.2.1
 * **Platform:** esp8266 2.4.2
 * **Board:** NodeMCU 1.0 (ESP-12E Module)
 * **CPU Frequency**: 80 MHz
@@ -38,7 +38,7 @@ The firmware must be configured before flashing to ESP8266. Rename `src/Firmware
 
 #### LOLIN (Wemos) D1 mini
 
-* **Arduino IDE:** 2.1.1
+* **Arduino IDE:** 2.2.1
 * **Platform:** esp8266 2.4.2
 * **Board:** LOLIN (WEMOS) D1 R2 & mini
 * **CPU Frequency**: 80 MHz
